@@ -2,20 +2,20 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { PlantRenderer } from '../lib/plantRenderer';
 import { useHandTracking } from '../hooks/useHandTracking';
 import type { GestureEvent } from '../lib/gestureDetector';
+import { RotateIcon, BloomIcon, SwooshIcon, InfoIcon } from '../components/GestureIcons';
+
+const FONT = "'Cormorant Garamond', Georgia, serif";
 
 export default function Garden() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<PlantRenderer | null>(null);
-  const [showInstructions, setShowInstructions] = useState(true);
-  const swooshCooldown = useRef<Map<string, number>>(new Map());
+  const [started, setStarted] = useState(false);
+  const [panelExpanded, setPanelExpanded] = useState(false);
 
   const handleGesture = useCallback((event: GestureEvent) => {
     const renderer = rendererRef.current;
     if (!renderer) return;
-
-    if (showInstructions) return;
-
-    const now = Date.now();
+    if (!started) return;
 
     switch (event.type) {
       case 'wristRotation':
@@ -28,17 +28,12 @@ export default function Garden() {
 
       case 'swooshLeft':
       case 'swooshRight': {
-        const key = `${event.type}-${event.handIndex}`;
-        const lastTime = swooshCooldown.current.get(key) || 0;
-        if (now - lastTime > 600) {
-          const side = event.type === 'swooshRight' ? 'right' : 'left';
-          renderer.addLeaf(event.handIndex, side);
-          swooshCooldown.current.set(key, now);
-        }
+        const side = event.type === 'swooshRight' ? 'right' : 'left';
+        renderer.addLeaf(event.handIndex, side);
         break;
       }
     }
-  }, [showInstructions]);
+  }, [started]);
 
   const { videoRef, cameraState, handsDetected } = useHandTracking(
     handleGesture,
@@ -61,9 +56,15 @@ export default function Garden() {
     };
   }, []);
 
-  const handleDismissInstructions = () => {
-    setShowInstructions(false);
+  const handleStart = () => {
+    setStarted(true);
   };
+
+  const gestureItems = [
+    { icon: <RotateIcon size={24} opacity={0.8} />, gesture: 'Rotate your wrist', effect: 'Grow vines upward' },
+    { icon: <BloomIcon size={24} opacity={0.8} />, gesture: 'Fist, then open wide', effect: 'Bloom flowers' },
+    { icon: <SwooshIcon size={24} opacity={0.8} />, gesture: 'Swoosh left or right', effect: 'Sprout leaves' },
+  ];
 
   return (
     <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', position: 'relative', background: '#33442A' }}>
@@ -99,8 +100,8 @@ export default function Garden() {
           bottom: 145,
           right: 20,
           color: '#E9E8D5',
-          fontSize: 12,
-          fontFamily: "'Georgia', serif",
+          fontSize: 16,
+          fontFamily: FONT,
           opacity: 0.6,
           zIndex: 10,
           textAlign: 'right',
@@ -111,33 +112,71 @@ export default function Garden() {
         </div>
       )}
 
-      {cameraState === 'active' && !showInstructions && (
-        <button
-          onClick={() => setShowInstructions(true)}
+      {cameraState === 'active' && started && (
+        <div
           style={{
             position: 'absolute',
             top: 20,
-            right: 20,
-            background: 'rgba(233, 232, 213, 0.1)',
-            border: '1px solid rgba(233, 232, 213, 0.2)',
-            color: '#E9E8D5',
-            borderRadius: '50%',
-            width: 36,
-            height: 36,
-            cursor: 'pointer',
-            fontSize: 16,
-            fontFamily: "'Georgia', serif",
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            left: 20,
             zIndex: 20,
-            transition: 'background 0.3s',
+            transition: 'all 0.3s ease',
           }}
-          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(233, 232, 213, 0.2)')}
-          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(233, 232, 213, 0.1)')}
         >
-          ?
-        </button>
+          <button
+            onClick={() => setPanelExpanded(!panelExpanded)}
+            style={{
+              background: 'rgba(233, 232, 213, 0.08)',
+              border: '1px solid rgba(233, 232, 213, 0.15)',
+              color: '#E9E8D5',
+              borderRadius: panelExpanded ? '8px 8px 0 0' : 8,
+              padding: '8px 14px',
+              cursor: 'pointer',
+              fontFamily: FONT,
+              fontSize: 16,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              transition: 'all 0.3s ease',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(233, 232, 213, 0.15)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(233, 232, 213, 0.08)')}
+          >
+            <InfoIcon size={18} opacity={0.8} />
+            <span style={{ opacity: 0.7 }}>Gestures</span>
+          </button>
+
+          {panelExpanded && (
+            <div style={{
+              background: 'rgba(51, 68, 42, 0.92)',
+              border: '1px solid rgba(233, 232, 213, 0.15)',
+              borderTop: 'none',
+              borderRadius: '0 0 8px 8px',
+              padding: '16px 18px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+              minWidth: 240,
+            }}>
+              {gestureItems.map((item, i) => (
+                <div key={i} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  color: '#E9E8D5',
+                  fontFamily: FONT,
+                }}>
+                  <div style={{ width: 28, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+                    {item.icon}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 16, opacity: 0.9 }}>{item.gesture}</div>
+                    <div style={{ fontSize: 16, opacity: 0.5, marginTop: 2 }}>{item.effect}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       {cameraState === 'denied' && (
@@ -148,11 +187,11 @@ export default function Garden() {
           transform: 'translate(-50%, -50%)',
           color: '#E9E8D5',
           textAlign: 'center',
-          fontFamily: "'Georgia', serif",
+          fontFamily: FONT,
           zIndex: 20,
         }}>
-          <p style={{ fontSize: 18, marginBottom: 12 }}>Camera access is needed</p>
-          <p style={{ fontSize: 14, opacity: 0.7 }}>
+          <p style={{ fontSize: 20, marginBottom: 16 }}>Camera access is needed</p>
+          <p style={{ fontSize: 16, opacity: 0.7 }}>
             Please allow camera access in your browser settings and reload the page.
           </p>
         </div>
@@ -166,11 +205,11 @@ export default function Garden() {
           transform: 'translate(-50%, -50%)',
           color: '#E9E8D5',
           textAlign: 'center',
-          fontFamily: "'Georgia', serif",
+          fontFamily: FONT,
           zIndex: 20,
         }}>
-          <p style={{ fontSize: 18, marginBottom: 12 }}>Something went wrong</p>
-          <p style={{ fontSize: 14, opacity: 0.7, marginBottom: 20 }}>
+          <p style={{ fontSize: 20, marginBottom: 16 }}>Something went wrong</p>
+          <p style={{ fontSize: 16, opacity: 0.7, marginBottom: 24 }}>
             Could not access the camera. Please check your device.
           </p>
           <button
@@ -179,11 +218,11 @@ export default function Garden() {
               background: 'transparent',
               border: '1px solid rgba(233, 232, 213, 0.4)',
               color: '#E9E8D5',
-              padding: '8px 24px',
+              padding: '10px 28px',
               borderRadius: 4,
               cursor: 'pointer',
-              fontFamily: "'Georgia', serif",
-              fontSize: 14,
+              fontFamily: FONT,
+              fontSize: 16,
             }}
           >
             Try Again
@@ -199,7 +238,7 @@ export default function Garden() {
           transform: 'translate(-50%, -50%)',
           color: '#E9E8D5',
           textAlign: 'center',
-          fontFamily: "'Georgia', serif",
+          fontFamily: FONT,
           zIndex: 20,
         }}>
           <h1 style={{
@@ -212,15 +251,15 @@ export default function Garden() {
             Hand Garden
           </h1>
           <p style={{
-            fontSize: 16,
+            fontSize: 18,
             opacity: 0.6,
             letterSpacing: 2,
-            marginBottom: 20,
+            marginBottom: 24,
           }}>
             Grow plants with your hands
           </p>
           <p style={{
-            fontSize: 14,
+            fontSize: 16,
             opacity: 0.5,
           }}>
             {cameraState === 'requesting'
@@ -230,9 +269,9 @@ export default function Garden() {
         </div>
       )}
 
-      {showInstructions && cameraState === 'active' && (
+      {!started && cameraState === 'active' && (
         <div
-          onClick={handleDismissInstructions}
+          onClick={handleStart}
           style={{
             position: 'absolute',
             top: 0,
@@ -250,7 +289,7 @@ export default function Garden() {
         >
           <h1 style={{
             color: '#E9E8D5',
-            fontFamily: "'Georgia', serif",
+            fontFamily: FONT,
             fontSize: 42,
             fontWeight: 300,
             letterSpacing: 6,
@@ -262,8 +301,8 @@ export default function Garden() {
 
           <p style={{
             color: '#E9E8D5',
-            fontFamily: "'Georgia', serif",
-            fontSize: 15,
+            fontFamily: FONT,
+            fontSize: 18,
             opacity: 0.5,
             marginBottom: 50,
             letterSpacing: 2,
@@ -277,24 +316,20 @@ export default function Garden() {
             gap: 28,
             maxWidth: 380,
           }}>
-            {[
-              { icon: '\u27F3', gesture: 'Rotate your wrist', effect: 'to grow vines upward' },
-              { icon: '\u270B', gesture: 'Open your hand wide', effect: 'to bloom flowers' },
-              { icon: '\u2194', gesture: 'Swoosh left or right', effect: 'to sprout leaves' },
-            ].map((item, i) => (
+            {gestureItems.map((item, i) => (
               <div key={i} style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 16,
                 color: '#E9E8D5',
-                fontFamily: "'Georgia', serif",
+                fontFamily: FONT,
               }}>
-                <span style={{ fontSize: 28, opacity: 0.7, width: 40, textAlign: 'center' }}>
+                <div style={{ width: 40, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
                   {item.icon}
-                </span>
+                </div>
                 <div>
-                  <div style={{ fontSize: 15, opacity: 0.9 }}>{item.gesture}</div>
-                  <div style={{ fontSize: 13, opacity: 0.5, marginTop: 2 }}>{item.effect}</div>
+                  <div style={{ fontSize: 18, opacity: 0.9 }}>{item.gesture}</div>
+                  <div style={{ fontSize: 16, opacity: 0.5, marginTop: 2 }}>{item.effect}</div>
                 </div>
               </div>
             ))}
@@ -302,8 +337,8 @@ export default function Garden() {
 
           <p style={{
             color: '#E9E8D5',
-            fontFamily: "'Georgia', serif",
-            fontSize: 12,
+            fontFamily: FONT,
+            fontSize: 16,
             opacity: 0.4,
             marginTop: 50,
           }}>

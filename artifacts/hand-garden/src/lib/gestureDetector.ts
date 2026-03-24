@@ -24,12 +24,33 @@ const MIDDLE_MCP = 9;
 const RING_MCP = 13;
 const PINKY_MCP = 17;
 
+const FIST_THRESHOLD = 1.1;
+const OPEN_THRESHOLD = 1.55;
+const OPEN_DELTA_THRESHOLD = 0.3;
+
+const ROTATION_ANGLE_THRESHOLD = Math.PI * 1.8;
+const ROTATION_RADIUS_THRESHOLD = 0.04;
+const ROTATION_MIN_POSITIONS = 12;
+const ROTATION_WINDOW_MS = 1200;
+
+const SWOOSH_SPEED_THRESHOLD = 0.002;
+const SWOOSH_DISTANCE_THRESHOLD = 0.2;
+
+const ROTATION_COOLDOWN_MS = 800;
+const EXTENSION_COOLDOWN_MS = 1200;
+const SWOOSH_COOLDOWN_MS = 1000;
+
 interface HandHistory {
   wristPositions: { x: number; y: number; time: number }[];
   lastOpenness: number;
+  wasFist: boolean;
+  fistStartTime: number;
   rotationAngle: number;
   lastSwooshX: number;
   lastSwooshTime: number;
+  lastRotationEmit: number;
+  lastExtensionEmit: number;
+  lastSwooshEmit: number;
 }
 
 export class GestureDetector {
@@ -52,9 +73,14 @@ export class GestureDetector {
       this.handHistories.set(handIndex, {
         wristPositions: [],
         lastOpenness: 0,
+        wasFist: false,
+        fistStartTime: 0,
         rotationAngle: 0,
         lastSwooshX: -1,
         lastSwooshTime: 0,
+        lastRotationEmit: 0,
+        lastExtensionEmit: 0,
+        lastSwooshEmit: 0,
       });
     }
     return this.handHistories.get(handIndex)!;
@@ -69,7 +95,7 @@ export class GestureDetector {
       const now = Date.now();
 
       this.detectWristRotation(landmarks, handIndex, history, now);
-      this.detectFingerExtension(landmarks, handIndex, history);
+      this.detectFingerExtension(landmarks, handIndex, history, now);
       this.detectSwoosh(landmarks, handIndex, history, now);
     });
 
@@ -87,23 +113,26 @@ export class GestureDetector {
     now: number
   ) {
     const wrist = landmarks[WRIST];
-    const pos = { x: wrist.x, y: wrist.y, time: now };
+    const middleMcp = landmarks[MIDDLE_MCP];
+    const cx = (wrist.x + middleMcp.x) / 2;
+    const cy = (wrist.y + middleMcp.y) / 2;
+    const pos = { x: cx, y: cy, time: now };
 
     history.wristPositions.push(pos);
 
-    const cutoff = now - 800;
+    const cutoff = now - ROTATION_WINDOW_MS;
     history.wristPositions = history.wristPositions.filter(p => p.time > cutoff);
 
-    if (history.wristPositions.length < 8) return;
+    if (history.wristPositions.length < ROTATION_MIN_POSITIONS) return;
 
     const positions = history.wristPositions;
-    const cx = positions.reduce((s, p) => s + p.x, 0) / positions.length;
-    const cy = positions.reduce((s, p) => s + p.y, 0) / positions.length;
+    const centerX = positions.reduce((s, p) => s + p.x, 0) / positions.length;
+    const centerY = positions.reduce((s, p) => s + p.y, 0) / positions.length;
 
     let totalAngle = 0;
     for (let i = 1; i < positions.length; i++) {
-      const prev = Math.atan2(positions[i - 1].y - cy, positions[i - 1].x - cx);
-      const curr = Math.atan2(positions[i].y - cy, positions[i].x - cx);
+      const prev = Math.atan2(positions[i - 1].y - centerY, positions[i - 1].x - centerX);
+      const curr = Math.atan2(positions[i].y - centerY, positions[i].x - centerX);
       let diff = curr - prev;
       if (diff > Math.PI) diff -= 2 * Math.PI;
       if (diff < -Math.PI) diff += 2 * Math.PI;
@@ -111,29 +140,26 @@ export class GestureDetector {
     }
 
     const absAngle = Math.abs(totalAngle);
-    if (absAngle > Math.PI * 0.5) {
+    if (absAngle > ROTATION_ANGLE_THRESHOLD) {
       const radius = positions.reduce((s, p) => {
-        return s + Math.sqrt((p.x - cx) ** 2 + (p.y - cy) ** 2);
+        return s + Math.sqrt((p.x - centerX) ** 2 + (p.y - centerY) ** 2);
       }, 0) / positions.length;
 
-      if (radius > 0.02) {
+      if (radius > ROTATION_RADIUS_THRESHOLD && now - history.lastRotationEmit > ROTATION_COOLDOWN_MS) {
         history.rotationAngle += absAngle;
+        history.lastRotationEmit = now;
         this.emit({
           type: 'wristRotation',
           handIndex,
           value: absAngle,
-          position: { x: cx, y: cy },
+          position: { x: centerX, y: centerY },
         });
-        history.wristPositions = history.wristPositions.slice(-3);
+        history.wristPositions = history.wristPositions.slice(-4);
       }
     }
   }
 
-  private detectFingerExtension(
-    landmarks: HandLandmark[],
-    handIndex: number,
-    history: HandHistory
-  ) {
+  private computeOpenness(landmarks: HandLandmark[]): number {
     const wrist = landmarks[WRIST];
     const tips = [THUMB_TIP, INDEX_TIP, MIDDLE_TIP, RING_TIP, PINKY_TIP];
     const mcps = [INDEX_MCP, INDEX_MCP, MIDDLE_MCP, RING_MCP, PINKY_MCP];
@@ -147,19 +173,43 @@ export class GestureDetector {
       totalExtension += mcpDist > 0.01 ? tipDist / mcpDist : 0;
     }
 
-    const openness = totalExtension / 5;
+    return totalExtension / 5;
+  }
 
-    const delta = openness - history.lastOpenness;
-    if (delta > 0.15 && openness > 1.3) {
-      this.emit({
-        type: 'fingerExtension',
-        handIndex,
-        value: delta,
-        position: {
-          x: landmarks[MIDDLE_TIP].x,
-          y: landmarks[MIDDLE_TIP].y,
-        },
-      });
+  private detectFingerExtension(
+    landmarks: HandLandmark[],
+    handIndex: number,
+    history: HandHistory,
+    now: number
+  ) {
+    const openness = this.computeOpenness(landmarks);
+
+    if (openness < FIST_THRESHOLD) {
+      if (!history.wasFist) {
+        history.wasFist = true;
+        history.fistStartTime = now;
+      }
+    } else if (history.wasFist && openness > OPEN_THRESHOLD) {
+      const delta = openness - history.lastOpenness;
+      const fistDuration = now - history.fistStartTime;
+
+      if (delta > OPEN_DELTA_THRESHOLD && fistDuration > 150 && now - history.lastExtensionEmit > EXTENSION_COOLDOWN_MS) {
+        history.lastExtensionEmit = now;
+        history.wasFist = false;
+        this.emit({
+          type: 'fingerExtension',
+          handIndex,
+          value: delta,
+          position: {
+            x: landmarks[MIDDLE_TIP].x,
+            y: landmarks[MIDDLE_TIP].y,
+          },
+        });
+      }
+    }
+
+    if (openness > FIST_THRESHOLD + 0.1) {
+      history.wasFist = false;
     }
 
     history.lastOpenness = openness;
@@ -182,16 +232,19 @@ export class GestureDetector {
     const dx = wrist.x - history.lastSwooshX;
     const dt = now - history.lastSwooshTime;
 
-    if (dt > 0 && dt < 500) {
+    if (dt > 0 && dt < 400) {
       const speed = Math.abs(dx) / dt;
-      if (speed > 0.0008 && Math.abs(dx) > 0.12) {
-        const type = dx > 0 ? 'swooshLeft' : 'swooshRight';
-        this.emit({
-          type,
-          handIndex,
-          value: Math.abs(dx),
-          position: { x: wrist.x, y: wrist.y },
-        });
+      if (speed > SWOOSH_SPEED_THRESHOLD && Math.abs(dx) > SWOOSH_DISTANCE_THRESHOLD) {
+        if (now - history.lastSwooshEmit > SWOOSH_COOLDOWN_MS) {
+          history.lastSwooshEmit = now;
+          const type = dx > 0 ? 'swooshLeft' : 'swooshRight';
+          this.emit({
+            type,
+            handIndex,
+            value: Math.abs(dx),
+            position: { x: wrist.x, y: wrist.y },
+          });
+        }
         history.lastSwooshX = wrist.x;
         history.lastSwooshTime = now;
         return;
