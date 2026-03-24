@@ -4,7 +4,7 @@ export interface HandLandmark {
   z: number;
 }
 
-export type GestureType = 'wristRotation' | 'fingerExtension' | 'swooshLeft' | 'swooshRight';
+export type GestureType = 'wristRotation' | 'openPalm' | 'pinch';
 
 export interface GestureEvent {
   type: GestureType;
@@ -15,42 +15,44 @@ export interface GestureEvent {
 
 const WRIST = 0;
 const THUMB_TIP = 4;
+const THUMB_IP = 3;
 const INDEX_TIP = 8;
+const INDEX_DIP = 7;
 const MIDDLE_TIP = 12;
+const MIDDLE_DIP = 11;
 const RING_TIP = 16;
+const RING_DIP = 15;
 const PINKY_TIP = 20;
+const PINKY_DIP = 19;
 const INDEX_MCP = 5;
 const MIDDLE_MCP = 9;
 const RING_MCP = 13;
 const PINKY_MCP = 17;
 
-const FIST_THRESHOLD = 1.1;
-const OPEN_THRESHOLD = 1.55;
-const OPEN_DELTA_THRESHOLD = 0.3;
+const ROTATION_ANGLE_THRESHOLD = Math.PI * 1.4;
+const ROTATION_RADIUS_THRESHOLD = 0.035;
+const ROTATION_MIN_POSITIONS = 10;
+const ROTATION_WINDOW_MS = 1500;
+const ROTATION_COOLDOWN_MS = 600;
 
-const ROTATION_ANGLE_THRESHOLD = Math.PI * 1.8;
-const ROTATION_RADIUS_THRESHOLD = 0.04;
-const ROTATION_MIN_POSITIONS = 12;
-const ROTATION_WINDOW_MS = 1200;
+const OPEN_PALM_OPENNESS_THRESHOLD = 1.45;
+const OPEN_PALM_STILL_MS = 400;
+const OPEN_PALM_EMIT_INTERVAL_MS = 800;
+const OPEN_PALM_MOVEMENT_THRESHOLD = 0.03;
 
-const SWOOSH_SPEED_THRESHOLD = 0.002;
-const SWOOSH_DISTANCE_THRESHOLD = 0.2;
-
-const ROTATION_COOLDOWN_MS = 800;
-const EXTENSION_COOLDOWN_MS = 1200;
-const SWOOSH_COOLDOWN_MS = 1000;
+const PINCH_DISTANCE_THRESHOLD = 0.06;
+const PINCH_EMIT_INTERVAL_MS = 1000;
 
 interface HandHistory {
   wristPositions: { x: number; y: number; time: number }[];
-  lastOpenness: number;
-  wasFist: boolean;
-  fistStartTime: number;
   rotationAngle: number;
-  lastSwooshX: number;
-  lastSwooshTime: number;
   lastRotationEmit: number;
-  lastExtensionEmit: number;
-  lastSwooshEmit: number;
+
+  openPalmStartTime: number;
+  lastOpenPalmEmit: number;
+  lastPalmPosition: { x: number; y: number } | null;
+
+  lastPinchEmit: number;
 }
 
 export class GestureDetector {
@@ -72,15 +74,12 @@ export class GestureDetector {
     if (!this.handHistories.has(handIndex)) {
       this.handHistories.set(handIndex, {
         wristPositions: [],
-        lastOpenness: 0,
-        wasFist: false,
-        fistStartTime: 0,
         rotationAngle: 0,
-        lastSwooshX: -1,
-        lastSwooshTime: 0,
         lastRotationEmit: 0,
-        lastExtensionEmit: 0,
-        lastSwooshEmit: 0,
+        openPalmStartTime: 0,
+        lastOpenPalmEmit: 0,
+        lastPalmPosition: null,
+        lastPinchEmit: 0,
       });
     }
     return this.handHistories.get(handIndex)!;
@@ -95,8 +94,8 @@ export class GestureDetector {
       const now = Date.now();
 
       this.detectWristRotation(landmarks, handIndex, history, now);
-      this.detectFingerExtension(landmarks, handIndex, history, now);
-      this.detectSwoosh(landmarks, handIndex, history, now);
+      this.detectOpenPalm(landmarks, handIndex, history, now);
+      this.detectPinch(landmarks, handIndex, history, now);
     });
 
     for (const [key] of this.handHistories) {
@@ -176,80 +175,107 @@ export class GestureDetector {
     return totalExtension / 5;
   }
 
-  private detectFingerExtension(
+  private isFingerExtended(landmarks: HandLandmark[], tipIdx: number, dipIdx: number, mcpIdx: number): boolean {
+    const wrist = landmarks[WRIST];
+    const tip = landmarks[tipIdx];
+    const dip = landmarks[dipIdx];
+    const mcp = landmarks[mcpIdx];
+
+    const tipDist = Math.sqrt((tip.x - wrist.x) ** 2 + (tip.y - wrist.y) ** 2);
+    const dipDist = Math.sqrt((dip.x - wrist.x) ** 2 + (dip.y - wrist.y) ** 2);
+    const mcpDist = Math.sqrt((mcp.x - wrist.x) ** 2 + (mcp.y - wrist.y) ** 2);
+
+    return tipDist > dipDist && tipDist > mcpDist * 1.1;
+  }
+
+  private detectOpenPalm(
     landmarks: HandLandmark[],
     handIndex: number,
     history: HandHistory,
     now: number
   ) {
     const openness = this.computeOpenness(landmarks);
+    const wrist = landmarks[WRIST];
+    const palmPos = { x: wrist.x, y: wrist.y };
 
-    if (openness < FIST_THRESHOLD) {
-      if (!history.wasFist) {
-        history.wasFist = true;
-        history.fistStartTime = now;
-      }
-    } else if (history.wasFist && openness > OPEN_THRESHOLD) {
-      const fistDuration = now - history.fistStartTime;
-
-      if (fistDuration > 150 && now - history.lastExtensionEmit > EXTENSION_COOLDOWN_MS) {
-        history.lastExtensionEmit = now;
-        history.wasFist = false;
-        this.emit({
-          type: 'fingerExtension',
-          handIndex,
-          value: openness - FIST_THRESHOLD,
-          position: {
-            x: landmarks[MIDDLE_TIP].x,
-            y: landmarks[MIDDLE_TIP].y,
-          },
-        });
-      }
-    } else if (openness > OPEN_THRESHOLD) {
-      history.wasFist = false;
+    if (openness < OPEN_PALM_OPENNESS_THRESHOLD) {
+      history.openPalmStartTime = 0;
+      history.lastPalmPosition = null;
+      return;
     }
 
-    history.lastOpenness = openness;
+    if (history.lastPalmPosition) {
+      const movement = Math.sqrt(
+        (palmPos.x - history.lastPalmPosition.x) ** 2 +
+        (palmPos.y - history.lastPalmPosition.y) ** 2
+      );
+      if (movement > OPEN_PALM_MOVEMENT_THRESHOLD) {
+        history.openPalmStartTime = now;
+      }
+    }
+
+    history.lastPalmPosition = palmPos;
+
+    if (history.openPalmStartTime === 0) {
+      history.openPalmStartTime = now;
+      return;
+    }
+
+    const heldDuration = now - history.openPalmStartTime;
+    if (heldDuration > OPEN_PALM_STILL_MS && now - history.lastOpenPalmEmit > OPEN_PALM_EMIT_INTERVAL_MS) {
+      history.lastOpenPalmEmit = now;
+      this.emit({
+        type: 'openPalm',
+        handIndex,
+        value: openness,
+        position: {
+          x: landmarks[MIDDLE_TIP].x,
+          y: landmarks[MIDDLE_TIP].y,
+        },
+      });
+    }
   }
 
-  private detectSwoosh(
+  private detectPinch(
     landmarks: HandLandmark[],
     handIndex: number,
     history: HandHistory,
     now: number
   ) {
-    const wrist = landmarks[WRIST];
+    const thumbTip = landmarks[THUMB_TIP];
+    const indexTip = landmarks[INDEX_TIP];
 
-    if (history.lastSwooshX < 0) {
-      history.lastSwooshX = wrist.x;
-      history.lastSwooshTime = now;
+    const pinchDist = Math.sqrt(
+      (thumbTip.x - indexTip.x) ** 2 +
+      (thumbTip.y - indexTip.y) ** 2
+    );
+
+    if (pinchDist > PINCH_DISTANCE_THRESHOLD) {
       return;
     }
 
-    const dx = wrist.x - history.lastSwooshX;
-    const dt = now - history.lastSwooshTime;
+    const middleExtended = this.isFingerExtended(landmarks, MIDDLE_TIP, MIDDLE_DIP, MIDDLE_MCP);
+    const ringExtended = this.isFingerExtended(landmarks, RING_TIP, RING_DIP, RING_MCP);
+    const pinkyExtended = this.isFingerExtended(landmarks, PINKY_TIP, PINKY_DIP, PINKY_MCP);
 
-    if (dt > 0 && dt < 400) {
-      const speed = Math.abs(dx) / dt;
-      if (speed > SWOOSH_SPEED_THRESHOLD && Math.abs(dx) > SWOOSH_DISTANCE_THRESHOLD) {
-        if (now - history.lastSwooshEmit > SWOOSH_COOLDOWN_MS) {
-          history.lastSwooshEmit = now;
-          const type = dx > 0 ? 'swooshLeft' : 'swooshRight';
-          this.emit({
-            type,
-            handIndex,
-            value: Math.abs(dx),
-            position: { x: wrist.x, y: wrist.y },
-          });
-        }
-        history.lastSwooshX = wrist.x;
-        history.lastSwooshTime = now;
-        return;
-      }
+    const otherFingersUp = (middleExtended ? 1 : 0) + (ringExtended ? 1 : 0) + (pinkyExtended ? 1 : 0);
+
+    if (otherFingersUp < 1) {
+      return;
     }
 
-    history.lastSwooshX = wrist.x;
-    history.lastSwooshTime = now;
+    if (now - history.lastPinchEmit > PINCH_EMIT_INTERVAL_MS) {
+      history.lastPinchEmit = now;
+      this.emit({
+        type: 'pinch',
+        handIndex,
+        value: 1 - pinchDist / PINCH_DISTANCE_THRESHOLD,
+        position: {
+          x: (thumbTip.x + indexTip.x) / 2,
+          y: (thumbTip.y + indexTip.y) / 2,
+        },
+      });
+    }
   }
 
   reset() {

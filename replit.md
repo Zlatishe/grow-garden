@@ -55,13 +55,13 @@ Every package extends `tsconfig.base.json` which sets `composite: true`. The roo
 Interactive hand gesture plant-growing web app. Users grow botanical line-art illustrations using webcam-based hand tracking. Built with React + Vite, runs entirely in the browser.
 
 - **Hand tracking**: MediaPipe Hands (CDN-loaded WASM models) via `@mediapipe/hands` and `@mediapipe/camera_utils`
-- **Gesture detection**: Custom `GestureDetector` class (`src/lib/gestureDetector.ts`) with strict thresholds and per-gesture cooldowns:
-  - Wrist Rotation: requires ~324 degrees of accumulated circular motion (1.8π), min radius 0.04, 800ms cooldown
-  - Finger Extension: requires fist-then-open transition (openness drops below 1.1, then rises above 1.55 with delta > 0.3), 1200ms cooldown
-  - Swoosh: requires speed > 0.002 and distance > 0.2 in normalized coords, 1000ms cooldown
-- **Plant rendering**: Canvas-based `PlantRenderer` class (`src/lib/plantRenderer.ts`) draws botanical line art (stems, flowers, leaves) in cream (#E9E8D5) on dark olive green (#33442A)
-- **UI**: Cormorant Garamond serif font (Google Fonts), minimum 16px text, no emoji — SVG line-art icons in `src/components/GestureIcons.tsx`
-- **Instructions**: Persistent expandable "Gestures" panel (top-left) accessible any time after dismissing the welcome overlay
+- **Gesture detection**: Custom `GestureDetector` class (`src/lib/gestureDetector.ts`) with three gesture types:
+  - Wrist Rotation (motion-based): ~252° accumulated circular motion (1.4π), min radius 0.035, 600ms cooldown, 1500ms window → grows vine/stem
+  - Open Palm (static pose): all fingers extended (openness > 1.45), hand held still for ~400ms, emits every 800ms while held → blooms flowers
+  - Pinch (static pose): thumb tip + index tip distance < 0.06 normalized, at least 1 other finger extended, emits every 1000ms while held → sprouts leaves
+- **Plant rendering**: Canvas-based `PlantRenderer` class (`src/lib/plantRenderer.ts`) draws a single botanical line-art plant (stem, flowers, leaves) in cream (#E9E8D5) on dark olive green (#33442A). Single-plant model — all gestures from any hand control one plant.
+- **UI**: Josefin Sans font (Google Fonts, weights 200/300), minimum 16px text, no emoji — SVG line-art icons in `src/components/GestureIcons.tsx` (RotateIcon, OpenPalmIcon, PinchIcon)
+- **Instructions**: Persistent expandable gesture panel (top-right) accessible any time after the welcome overlay
 - Entry: `src/main.tsx` → `src/App.tsx` → `src/pages/Garden.tsx`
 - No backend dependency — purely frontend
 - `pnpm --filter @workspace/hand-garden run dev` — start dev server

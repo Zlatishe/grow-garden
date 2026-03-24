@@ -25,7 +25,6 @@ interface Leaf {
   angle: number;
   side: 'left' | 'right';
   growProgress: number;
-  stemIndex: number;
 }
 
 interface Stem {
@@ -38,11 +37,12 @@ interface Stem {
 export class PlantRenderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
-  private stems: Stem[] = [];
+  private stem: Stem | null = null;
   private flowers: Flower[] = [];
   private leaves: Leaf[] = [];
   private animationFrame: number = 0;
   private time: number = 0;
+  private nextLeafSide: 'left' | 'right' = 'left';
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -59,23 +59,21 @@ export class PlantRenderer {
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
-  private ensureStem(index: number): Stem {
-    while (this.stems.length <= index) {
-      const count = this.stems.length + 1;
+  private ensureStem(): Stem {
+    if (!this.stem) {
       const w = window.innerWidth;
-      const baseX = count === 1 ? w * 0.5 : (this.stems.length === 0 ? w * 0.4 : w * 0.6);
-      this.stems.push({
-        segments: [{ x: baseX, y: window.innerHeight - 40, angle: -Math.PI / 2, thickness: 2.5 }],
-        baseX,
+      this.stem = {
+        segments: [{ x: w * 0.5, y: window.innerHeight - 40, angle: -Math.PI / 2, thickness: 2.5 }],
+        baseX: w * 0.5,
         growthProgress: 0,
         spiralAngle: 0,
-      });
+      };
     }
-    return this.stems[index];
+    return this.stem;
   }
 
-  growStem(handIndex: number, rotationAmount: number) {
-    const stem = this.ensureStem(handIndex);
+  growStem(rotationAmount: number) {
+    const stem = this.ensureStem();
     const last = stem.segments[stem.segments.length - 1];
 
     stem.spiralAngle += rotationAmount * 1.5;
@@ -104,8 +102,8 @@ export class PlantRenderer {
     stem.growthProgress += segmentLength;
   }
 
-  addFlower(handIndex: number, intensity: number) {
-    const stem = this.stems[handIndex];
+  addFlower(intensity: number) {
+    const stem = this.stem;
     if (!stem || stem.segments.length < 5) return;
 
     const segIdx = Math.max(3, stem.segments.length - Math.floor(Math.random() * 5) - 1);
@@ -118,7 +116,7 @@ export class PlantRenderer {
     if (tooClose) {
       this.flowers.forEach(f => {
         if (f.targetBloom < 1) {
-          f.targetBloom = Math.min(1, f.targetBloom + intensity * 0.5);
+          f.targetBloom = Math.min(1, f.targetBloom + 0.3);
         }
       });
       return;
@@ -131,20 +129,20 @@ export class PlantRenderer {
       petalCount,
       petalSize: 8 + Math.random() * 10,
       bloomProgress: 0,
-      targetBloom: Math.min(1, 0.3 + intensity * 0.5),
+      targetBloom: Math.min(1, 0.3 + intensity * 0.3),
       rotation: Math.random() * Math.PI * 2,
     });
   }
 
-  addLeaf(handIndex: number, side: 'left' | 'right') {
-    const stemIdx = this.stems.length > 0 ? Math.min(handIndex, this.stems.length - 1) : -1;
-    if (stemIdx < 0) return;
-
-    const stem = this.stems[stemIdx];
-    if (stem.segments.length < 4) return;
+  addLeaf() {
+    const stem = this.stem;
+    if (!stem || stem.segments.length < 4) return;
 
     const segIdx = 3 + Math.floor(Math.random() * (stem.segments.length - 3));
     const seg = stem.segments[segIdx];
+
+    const side = this.nextLeafSide;
+    this.nextLeafSide = side === 'left' ? 'right' : 'left';
 
     const baseAngle = side === 'left'
       ? seg.angle - Math.PI / 2 - Math.random() * 0.4
@@ -157,7 +155,6 @@ export class PlantRenderer {
       angle: baseAngle,
       side,
       growProgress: 0,
-      stemIndex: stemIdx,
     });
   }
 
@@ -361,25 +358,23 @@ export class PlantRenderer {
     const sway = Math.sin(this.time * 0.3) * 0.5;
     ctx.save();
 
-    this.stems.forEach(stem => {
+    if (this.stem) {
       ctx.save();
       const stemSway = sway * 0.002;
       ctx.transform(1, 0, stemSway, 1, 0, 0);
-      this.drawStem(stem);
+      this.drawStem(this.stem);
       ctx.restore();
-    });
+    }
 
     this.leaves.forEach(leaf => this.drawLeaf(leaf));
     this.flowers.forEach(flower => this.drawFlower(flower));
 
-    this.stems.forEach(stem => {
-      if (stem.segments.length > 3) {
-        const tipSeg = stem.segments[stem.segments.length - 1];
-        if (this.flowers.length === 0 && this.leaves.length === 0) {
-          this.drawSmallBud(tipSeg.x, tipSeg.y - 3, 4);
-        }
+    if (this.stem && this.stem.segments.length > 3) {
+      const tipSeg = this.stem.segments[this.stem.segments.length - 1];
+      if (this.flowers.length === 0 && this.leaves.length === 0) {
+        this.drawSmallBud(tipSeg.x, tipSeg.y - 3, 4);
       }
-    });
+    }
 
     ctx.restore();
   }
@@ -400,7 +395,7 @@ export class PlantRenderer {
   }
 
   reset() {
-    this.stems = [];
+    this.stem = null;
     this.flowers = [];
     this.leaves = [];
   }

@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { PlantRenderer } from '../lib/plantRenderer';
 import { useHandTracking } from '../hooks/useHandTracking';
 import type { GestureEvent } from '../lib/gestureDetector';
-import { RotateIcon, BloomIcon, SwooshIcon } from '../components/GestureIcons';
+import { RotateIcon, OpenPalmIcon, PinchIcon } from '../components/GestureIcons';
 
 const FONT = "'Josefin Sans', sans-serif";
 
@@ -19,19 +19,16 @@ export default function Garden() {
 
     switch (event.type) {
       case 'wristRotation':
-        renderer.growStem(event.handIndex, event.value);
+        renderer.growStem(event.value);
         break;
 
-      case 'fingerExtension':
-        renderer.addFlower(event.handIndex, event.value);
+      case 'openPalm':
+        renderer.addFlower(event.value);
         break;
 
-      case 'swooshLeft':
-      case 'swooshRight': {
-        const side = event.type === 'swooshRight' ? 'right' : 'left';
-        renderer.addLeaf(event.handIndex, side);
+      case 'pinch':
+        renderer.addLeaf();
         break;
-      }
     }
   }, [started]);
 
@@ -62,8 +59,8 @@ export default function Garden() {
 
   const gestureItems = [
     { icon: <RotateIcon size={24} opacity={0.8} />, gesture: 'Rotate your wrist', effect: 'Grow vines upward' },
-    { icon: <BloomIcon size={24} opacity={0.8} />, gesture: 'Fist, then open wide', effect: 'Bloom flowers' },
-    { icon: <SwooshIcon size={24} opacity={0.8} />, gesture: 'Swoosh left or right', effect: 'Sprout leaves' },
+    { icon: <OpenPalmIcon size={24} opacity={0.8} />, gesture: 'Hold palm open', effect: 'Bloom flowers' },
+    { icon: <PinchIcon size={24} opacity={0.8} />, gesture: 'Pinch fingers', effect: 'Sprout leaves' },
   ];
 
   return (
@@ -140,8 +137,8 @@ export default function Garden() {
             onMouseLeave={e => (e.currentTarget.style.background = 'rgba(233, 232, 213, 0.08)')}
           >
             <RotateIcon size={20} opacity={0.6} />
-            <BloomIcon size={20} opacity={0.6} />
-            <SwooshIcon size={20} opacity={0.6} />
+            <OpenPalmIcon size={20} opacity={0.6} />
+            <PinchIcon size={20} opacity={0.6} />
           </button>
 
           {panelExpanded && (
