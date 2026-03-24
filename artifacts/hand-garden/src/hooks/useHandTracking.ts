@@ -68,9 +68,9 @@ export function useHandTracking(
       cameraRef.current = camera;
       await camera.start();
       setCameraState('active');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Camera error:', err);
-      if (err.name === 'NotAllowedError') {
+      if (err instanceof DOMException && err.name === 'NotAllowedError') {
         setCameraState('denied');
       } else {
         setCameraState('error');
