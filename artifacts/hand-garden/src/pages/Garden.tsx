@@ -6,13 +6,14 @@ import type { GestureEvent } from '../lib/gestureDetector';
 export default function Garden() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<PlantRenderer | null>(null);
-  const [started, setStarted] = useState(false);
   const [showInstructions, setShowInstructions] = useState(true);
   const swooshCooldown = useRef<Map<string, number>>(new Map());
 
   const handleGesture = useCallback((event: GestureEvent) => {
     const renderer = rendererRef.current;
     if (!renderer) return;
+
+    if (showInstructions) return;
 
     const now = Date.now();
 
@@ -30,18 +31,18 @@ export default function Garden() {
         const key = `${event.type}-${event.handIndex}`;
         const lastTime = swooshCooldown.current.get(key) || 0;
         if (now - lastTime > 600) {
-          const side = event.type === 'swooshLeft' ? 'left' : 'right';
+          const side = event.type === 'swooshRight' ? 'right' : 'left';
           renderer.addLeaf(event.handIndex, side);
           swooshCooldown.current.set(key, now);
         }
         break;
       }
     }
-  }, []);
+  }, [showInstructions]);
 
-  const { videoRef, cameraState, handsDetected, startTracking } = useHandTracking(
+  const { videoRef, cameraState, handsDetected } = useHandTracking(
     handleGesture,
-    started
+    true
   );
 
   useEffect(() => {
@@ -59,14 +60,6 @@ export default function Garden() {
       window.removeEventListener('resize', handleResize);
     };
   }, []);
-
-  const handleStart = () => {
-    setStarted(true);
-    setShowInstructions(false);
-    if (cameraState === 'idle') {
-      startTracking();
-    }
-  };
 
   const handleDismissInstructions = () => {
     setShowInstructions(false);
@@ -89,7 +82,7 @@ export default function Garden() {
           height: 120,
           borderRadius: 8,
           border: '1px solid rgba(233, 232, 213, 0.3)',
-          opacity: started && cameraState === 'active' ? 0.8 : 0,
+          opacity: cameraState === 'active' ? 0.8 : 0,
           transform: 'scaleX(-1)',
           objectFit: 'cover',
           transition: 'opacity 0.5s ease',
@@ -100,7 +93,7 @@ export default function Garden() {
         muted
       />
 
-      {started && cameraState === 'active' && (
+      {cameraState === 'active' && (
         <div style={{
           position: 'absolute',
           bottom: 145,
@@ -118,7 +111,7 @@ export default function Garden() {
         </div>
       )}
 
-      {started && cameraState === 'active' && !showInstructions && (
+      {cameraState === 'active' && !showInstructions && (
         <button
           onClick={() => setShowInstructions(true)}
           style={{
@@ -198,7 +191,7 @@ export default function Garden() {
         </div>
       )}
 
-      {cameraState === 'requesting' && (
+      {(cameraState === 'idle' || cameraState === 'requesting') && (
         <div style={{
           position: 'absolute',
           top: '50%',
@@ -208,29 +201,8 @@ export default function Garden() {
           textAlign: 'center',
           fontFamily: "'Georgia', serif",
           zIndex: 20,
-          opacity: 0.8,
-        }}>
-          <p style={{ fontSize: 16 }}>Requesting camera access...</p>
-        </div>
-      )}
-
-      {!started && cameraState === 'idle' && (
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 30,
-          background: 'rgba(51, 68, 42, 0.95)',
         }}>
           <h1 style={{
-            color: '#E9E8D5',
-            fontFamily: "'Georgia', serif",
             fontSize: 48,
             fontWeight: 300,
             letterSpacing: 6,
@@ -239,99 +211,26 @@ export default function Garden() {
           }}>
             Hand Garden
           </h1>
-
           <p style={{
-            color: '#E9E8D5',
-            fontFamily: "'Georgia', serif",
             fontSize: 16,
             opacity: 0.6,
-            marginBottom: 60,
             letterSpacing: 2,
+            marginBottom: 20,
           }}>
             Grow plants with your hands
           </p>
-
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 24,
-            marginBottom: 60,
-            maxWidth: 420,
-          }}>
-            {[
-              { gesture: 'Rotate your wrist', effect: 'Grow spiraling vines' },
-              { gesture: 'Open your fist', effect: 'Bloom flowers' },
-              { gesture: 'Swoosh left or right', effect: 'Sprout leaves' },
-            ].map((item, i) => (
-              <div key={i} style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 20,
-                color: '#E9E8D5',
-                fontFamily: "'Georgia', serif",
-              }}>
-                <div style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: '50%',
-                  border: '1px solid rgba(233, 232, 213, 0.3)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 14,
-                  opacity: 0.7,
-                  flexShrink: 0,
-                }}>
-                  {i + 1}
-                </div>
-                <div>
-                  <div style={{ fontSize: 15, opacity: 0.9 }}>{item.gesture}</div>
-                  <div style={{ fontSize: 13, opacity: 0.5, marginTop: 2 }}>{item.effect}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <button
-            onClick={handleStart}
-            style={{
-              background: 'transparent',
-              border: '1px solid rgba(233, 232, 213, 0.4)',
-              color: '#E9E8D5',
-              padding: '14px 48px',
-              borderRadius: 4,
-              cursor: 'pointer',
-              fontFamily: "'Georgia', serif",
-              fontSize: 16,
-              letterSpacing: 3,
-              textTransform: 'uppercase',
-              transition: 'all 0.3s ease',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = 'rgba(233, 232, 213, 0.1)';
-              e.currentTarget.style.borderColor = 'rgba(233, 232, 213, 0.6)';
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = 'transparent';
-              e.currentTarget.style.borderColor = 'rgba(233, 232, 213, 0.4)';
-            }}
-          >
-            Begin
-          </button>
-
           <p style={{
-            color: '#E9E8D5',
-            fontFamily: "'Georgia', serif",
-            fontSize: 12,
-            opacity: 0.4,
-            marginTop: 24,
+            fontSize: 14,
+            opacity: 0.5,
           }}>
-            Camera access required for hand tracking
+            {cameraState === 'requesting'
+              ? 'Please allow camera access...'
+              : 'Initializing camera...'}
           </p>
         </div>
       )}
 
-      {showInstructions && started && cameraState === 'active' && (
+      {showInstructions && cameraState === 'active' && (
         <div
           onClick={handleDismissInstructions}
           style={{
@@ -345,10 +244,33 @@ export default function Garden() {
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 25,
-            background: 'rgba(51, 68, 42, 0.85)',
+            background: 'rgba(51, 68, 42, 0.88)',
             cursor: 'pointer',
           }}
         >
+          <h1 style={{
+            color: '#E9E8D5',
+            fontFamily: "'Georgia', serif",
+            fontSize: 42,
+            fontWeight: 300,
+            letterSpacing: 6,
+            marginBottom: 8,
+            textTransform: 'uppercase',
+          }}>
+            Hand Garden
+          </h1>
+
+          <p style={{
+            color: '#E9E8D5',
+            fontFamily: "'Georgia', serif",
+            fontSize: 15,
+            opacity: 0.5,
+            marginBottom: 50,
+            letterSpacing: 2,
+          }}>
+            Grow plants with your hands
+          </p>
+
           <div style={{
             display: 'flex',
             flexDirection: 'column',
@@ -383,9 +305,9 @@ export default function Garden() {
             fontFamily: "'Georgia', serif",
             fontSize: 12,
             opacity: 0.4,
-            marginTop: 40,
+            marginTop: 50,
           }}>
-            Tap anywhere to dismiss
+            Tap anywhere to begin
           </p>
         </div>
       )}
