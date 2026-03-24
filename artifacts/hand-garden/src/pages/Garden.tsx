@@ -72,7 +72,6 @@ export default function Garden() {
         ref={canvasRef}
         style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
       />
-
       <video
         ref={videoRef}
         style={{
@@ -93,7 +92,6 @@ export default function Garden() {
         playsInline
         muted
       />
-
       {cameraState === 'active' && (
         <div style={{
           position: 'absolute',
@@ -111,7 +109,6 @@ export default function Garden() {
             : 'Show your hands'}
         </div>
       )}
-
       {cameraState === 'active' && started && (
         <div
           style={{
@@ -170,7 +167,7 @@ export default function Garden() {
                     {item.icon}
                   </div>
                   <div>
-                    <div style={{ fontSize: 16, opacity: 0.9 }}>{item.gesture}</div>
+                    <div style={{ fontSize: 16, opacity: 0.9 }} className="text-[18px]">{item.gesture}</div>
                     <div style={{ fontSize: 16, opacity: 0.5, marginTop: 2 }}>{item.effect}</div>
                   </div>
                 </div>
@@ -179,7 +176,6 @@ export default function Garden() {
           )}
         </div>
       )}
-
       {cameraState === 'denied' && (
         <div style={{
           position: 'absolute',
@@ -197,7 +193,6 @@ export default function Garden() {
           </p>
         </div>
       )}
-
       {cameraState === 'error' && (
         <div style={{
           position: 'absolute',
@@ -230,7 +225,6 @@ export default function Garden() {
           </button>
         </div>
       )}
-
       {(cameraState === 'idle' || cameraState === 'requesting') && (
         <div style={{
           position: 'absolute',
@@ -269,7 +263,6 @@ export default function Garden() {
           </p>
         </div>
       )}
-
       {!started && cameraState === 'active' && (
         <div
           onClick={handleStart}
