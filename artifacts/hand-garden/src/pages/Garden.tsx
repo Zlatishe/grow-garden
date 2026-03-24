@@ -97,13 +97,13 @@ export default function Garden() {
           style={{
             position: 'absolute',
             bottom: 145,
-            left: 20,
+            right: 20,
             color: '#E9E8D5',
             fontSize: 24,
             fontFamily: FONT,
             opacity: 0.6,
             zIndex: 10,
-            textAlign: 'left',
+            textAlign: 'right',
           }}>
           {handsDetected > 0
             ? `${handsDetected} hand${handsDetected > 1 ? 's' : ''} detected`
@@ -115,7 +115,7 @@ export default function Garden() {
           style={{
             position: 'absolute',
             top: 20,
-            left: 20,
+            right: 20,
             zIndex: 20,
             transition: 'all 0.3s ease',
           }}
