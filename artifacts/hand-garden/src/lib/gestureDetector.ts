@@ -260,7 +260,7 @@ export class GestureDetector {
 
     const otherFingersUp = (middleExtended ? 1 : 0) + (ringExtended ? 1 : 0) + (pinkyExtended ? 1 : 0);
 
-    if (otherFingersUp < 2) {
+    if (otherFingersUp < 3) {
       return;
     }
 

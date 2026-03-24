@@ -57,8 +57,8 @@ Interactive hand gesture plant-growing web app. Users grow botanical line-art il
 - **Hand tracking**: MediaPipe Hands (CDN-loaded WASM models) via `@mediapipe/hands` and `@mediapipe/camera_utils`
 - **Gesture detection**: Custom `GestureDetector` class (`src/lib/gestureDetector.ts`) with three gesture types:
   - Wrist Rotation (motion-based): ~252° accumulated circular motion (1.4π), min radius 0.035, 600ms cooldown, 1500ms window → grows vine/stem
-  - Open Palm (static pose): all fingers extended (openness > 1.45), hand held still for ~400ms, emits every 800ms while held → blooms flowers
-  - Pinch (static pose): thumb tip + index tip distance < 0.06 normalized, at least 1 other finger extended, emits every 1000ms while held → sprouts leaves
+  - Open Palm (static pose): all fingers extended (openness > 1.45), hand held still for ~500ms, emits every 800ms while held → blooms flowers
+  - Pinch (static pose): thumb tip + index tip distance < 0.06 normalized, all 3 other fingers extended, emits every 1000ms while held → sprouts leaves
 - **Plant rendering**: Canvas-based `PlantRenderer` class (`src/lib/plantRenderer.ts`) draws a single botanical line-art plant (stem, flowers, leaves) in cream (#E9E8D5) on dark olive green (#33442A). Single-plant model — all gestures from any hand control one plant.
 - **UI**: Josefin Sans font (Google Fonts, weights 200/300), minimum 16px text, no emoji — SVG line-art icons in `src/components/GestureIcons.tsx` (RotateIcon, OpenPalmIcon, PinchIcon)
 - **Instructions**: Persistent expandable gesture panel (top-right) accessible any time after the welcome overlay
