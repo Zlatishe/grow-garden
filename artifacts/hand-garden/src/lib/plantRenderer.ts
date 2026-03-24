@@ -8,6 +8,13 @@ interface StemSegment {
   thickness: number;
 }
 
+interface Branch {
+  segments: StemSegment[];
+  angle: number;
+  maxLength: number;
+  growthProgress: number;
+}
+
 interface Flower {
   x: number;
   y: number;
@@ -27,22 +34,25 @@ interface Leaf {
   growProgress: number;
 }
 
-interface Stem {
+interface Vine {
   segments: StemSegment[];
+  branches: Branch[];
   baseX: number;
   growthProgress: number;
   spiralAngle: number;
+  segmentsSinceLastBranch: number;
+  flowers: Flower[];
+  leaves: Leaf[];
+  nextLeafSide: 'left' | 'right';
 }
 
 export class PlantRenderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
-  private stem: Stem | null = null;
-  private flowers: Flower[] = [];
-  private leaves: Leaf[] = [];
+  private vines: Map<number, Vine> = new Map();
   private animationFrame: number = 0;
   private time: number = 0;
-  private nextLeafSide: 'left' | 'right' = 'left';
+  private handCount: number = 1;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -59,25 +69,68 @@ export class PlantRenderer {
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
-  private ensureStem(): Stem {
-    if (!this.stem) {
-      const w = window.innerWidth;
-      this.stem = {
-        segments: [{ x: w * 0.5, y: window.innerHeight - 40, angle: -Math.PI / 2, thickness: 2.5 }],
-        baseX: w * 0.5,
-        growthProgress: 0,
-        spiralAngle: 0,
-      };
+  setHandCount(count: number) {
+    const newCount = Math.max(1, Math.min(2, count));
+    if (newCount !== this.handCount) {
+      this.handCount = newCount;
+      this.repositionVines();
     }
-    return this.stem;
   }
 
-  growStem(rotationAmount: number) {
-    const stem = this.ensureStem();
-    const last = stem.segments[stem.segments.length - 1];
+  private repositionVines() {
+    for (const [handIndex, vine] of this.vines) {
+      const newBaseX = this.getVineBaseX(handIndex);
+      const offsetX = newBaseX - vine.baseX;
+      if (Math.abs(offsetX) < 1) continue;
 
-    stem.spiralAngle += rotationAmount * 1.5;
-    const spiralInfluence = Math.sin(stem.spiralAngle) * 0.3;
+      vine.baseX = newBaseX;
+      for (const seg of vine.segments) {
+        seg.x += offsetX;
+      }
+      for (const branch of vine.branches) {
+        for (const seg of branch.segments) {
+          seg.x += offsetX;
+        }
+      }
+      for (const flower of vine.flowers) {
+        flower.x += offsetX;
+      }
+      for (const leaf of vine.leaves) {
+        leaf.x += offsetX;
+      }
+    }
+  }
+
+  private getVineBaseX(handIndex: number): number {
+    const w = window.innerWidth;
+    if (this.handCount <= 1) return w * 0.5;
+    return handIndex === 0 ? w * 0.35 : w * 0.65;
+  }
+
+  private ensureVine(handIndex: number): Vine {
+    if (!this.vines.has(handIndex)) {
+      const baseX = this.getVineBaseX(handIndex);
+      this.vines.set(handIndex, {
+        segments: [{ x: baseX, y: window.innerHeight - 40, angle: -Math.PI / 2, thickness: 2.5 }],
+        branches: [],
+        baseX,
+        growthProgress: 0,
+        spiralAngle: 0,
+        segmentsSinceLastBranch: 0,
+        flowers: [],
+        leaves: [],
+        nextLeafSide: 'left',
+      });
+    }
+    return this.vines.get(handIndex)!;
+  }
+
+  growStem(rotationAmount: number, handIndex: number = 0) {
+    const vine = this.ensureVine(handIndex);
+    const last = vine.segments[vine.segments.length - 1];
+
+    vine.spiralAngle += rotationAmount * 1.5;
+    const spiralInfluence = Math.sin(vine.spiralAngle) * 0.3;
 
     const segmentLength = 6 + Math.random() * 3;
     const baseAngle = -Math.PI / 2;
@@ -90,31 +143,70 @@ export class PlantRenderer {
     const newX = last.x + Math.cos(newAngle) * segmentLength;
     const newY = last.y + Math.sin(newAngle) * segmentLength;
 
-    const thickness = Math.max(0.8, 2.5 - stem.segments.length * 0.015);
+    const thickness = Math.max(0.8, 2.5 - vine.segments.length * 0.015);
 
-    stem.segments.push({
+    vine.segments.push({
       x: newX,
       y: newY,
       angle: newAngle,
       thickness,
     });
 
-    stem.growthProgress += segmentLength;
+    vine.growthProgress += segmentLength;
+    vine.segmentsSinceLastBranch++;
+
+    const branchInterval = 8 + Math.floor(Math.random() * 5);
+    if (vine.segmentsSinceLastBranch >= branchInterval && vine.segments.length > 5) {
+      this.spawnBranch(vine, vine.segments.length - 1);
+      vine.segmentsSinceLastBranch = 0;
+    }
   }
 
-  addFlower(intensity: number) {
-    const stem = this.stem;
-    if (!stem || stem.segments.length < 5) return;
+  private spawnBranch(vine: Vine, segIdx: number) {
+    const seg = vine.segments[segIdx];
+    const side = Math.random() > 0.5 ? 1 : -1;
+    const branchAngle = seg.angle + side * (Math.PI / 4 + Math.random() * Math.PI / 6);
+    const maxLen = 3 + Math.floor(Math.random() * 5);
 
-    const segIdx = Math.max(3, stem.segments.length - Math.floor(Math.random() * 5) - 1);
-    const seg = stem.segments[segIdx];
+    const branch: Branch = {
+      segments: [{ x: seg.x, y: seg.y, angle: branchAngle, thickness: seg.thickness * 0.6 }],
+      angle: branchAngle,
+      maxLength: maxLen,
+      growthProgress: 0,
+    };
 
-    const tooClose = this.flowers.some(f => {
-      const dist = Math.sqrt((f.x - seg.x) ** 2 + (f.y - seg.y) ** 2);
+    for (let i = 0; i < maxLen; i++) {
+      const prev = branch.segments[branch.segments.length - 1];
+      const bLen = 4 + Math.random() * 2;
+      const wobble = (Math.random() - 0.5) * 0.2;
+      const a = branchAngle + wobble;
+      branch.segments.push({
+        x: prev.x + Math.cos(a) * bLen,
+        y: prev.y + Math.sin(a) * bLen,
+        angle: a,
+        thickness: Math.max(0.5, prev.thickness * 0.85),
+      });
+    }
+
+    branch.growthProgress = 1;
+    vine.branches.push(branch);
+  }
+
+  addFlower(intensity: number, handIndex: number = 0) {
+    const vine = this.vines.get(handIndex);
+    if (!vine || vine.segments.length < 5) return;
+
+    const allAttachPoints = this.getAttachPoints(vine);
+    if (allAttachPoints.length === 0) return;
+
+    const pt = allAttachPoints[Math.floor(Math.random() * allAttachPoints.length)];
+
+    const tooClose = vine.flowers.some(f => {
+      const dist = Math.sqrt((f.x - pt.x) ** 2 + (f.y - pt.y) ** 2);
       return dist < 40;
     });
     if (tooClose) {
-      this.flowers.forEach(f => {
+      vine.flowers.forEach(f => {
         if (f.targetBloom < 1) {
           f.targetBloom = Math.min(1, f.targetBloom + 0.3);
         }
@@ -123,9 +215,9 @@ export class PlantRenderer {
     }
 
     const petalCount = 5 + Math.floor(Math.random() * 4);
-    this.flowers.push({
-      x: seg.x + (Math.random() - 0.5) * 8,
-      y: seg.y + (Math.random() - 0.5) * 8,
+    vine.flowers.push({
+      x: pt.x + (Math.random() - 0.5) * 8,
+      y: pt.y + (Math.random() - 0.5) * 8,
       petalCount,
       petalSize: 8 + Math.random() * 10,
       bloomProgress: 0,
@@ -134,23 +226,25 @@ export class PlantRenderer {
     });
   }
 
-  addLeaf() {
-    const stem = this.stem;
-    if (!stem || stem.segments.length < 4) return;
+  addLeaf(handIndex: number = 0) {
+    const vine = this.vines.get(handIndex);
+    if (!vine || vine.segments.length < 4) return;
 
-    const segIdx = 3 + Math.floor(Math.random() * (stem.segments.length - 3));
-    const seg = stem.segments[segIdx];
+    const allAttachPoints = this.getAttachPoints(vine);
+    if (allAttachPoints.length === 0) return;
 
-    const side = this.nextLeafSide;
-    this.nextLeafSide = side === 'left' ? 'right' : 'left';
+    const pt = allAttachPoints[Math.floor(Math.random() * allAttachPoints.length)];
+
+    const side = vine.nextLeafSide;
+    vine.nextLeafSide = side === 'left' ? 'right' : 'left';
 
     const baseAngle = side === 'left'
-      ? seg.angle - Math.PI / 2 - Math.random() * 0.4
-      : seg.angle + Math.PI / 2 + Math.random() * 0.4;
+      ? pt.angle - Math.PI / 2 - Math.random() * 0.4
+      : pt.angle + Math.PI / 2 + Math.random() * 0.4;
 
-    this.leaves.push({
-      x: seg.x,
-      y: seg.y,
+    vine.leaves.push({
+      x: pt.x,
+      y: pt.y,
       size: 15 + Math.random() * 20,
       angle: baseAngle,
       side,
@@ -158,25 +252,41 @@ export class PlantRenderer {
     });
   }
 
-  private drawStem(stem: Stem) {
+  private getAttachPoints(vine: Vine): StemSegment[] {
+    const points: StemSegment[] = [];
+
+    for (let i = 3; i < vine.segments.length; i++) {
+      points.push(vine.segments[i]);
+    }
+
+    for (const branch of vine.branches) {
+      for (let i = 1; i < branch.segments.length; i++) {
+        points.push(branch.segments[i]);
+      }
+    }
+
+    return points;
+  }
+
+  private drawSegments(segments: StemSegment[]) {
     const ctx = this.ctx;
-    if (stem.segments.length < 2) return;
+    if (segments.length < 2) return;
 
     ctx.strokeStyle = CREAM;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    for (let i = 1; i < stem.segments.length; i++) {
-      const prev = stem.segments[i - 1];
-      const curr = stem.segments[i];
+    for (let i = 1; i < segments.length; i++) {
+      const prev = segments[i - 1];
+      const curr = segments[i];
 
       ctx.beginPath();
       ctx.lineWidth = curr.thickness;
-      ctx.globalAlpha = Math.min(1, 0.6 + (i / stem.segments.length) * 0.4);
+      ctx.globalAlpha = Math.min(1, 0.6 + (i / segments.length) * 0.4);
       ctx.moveTo(prev.x, prev.y);
 
-      if (i < stem.segments.length - 1) {
-        const next = stem.segments[i + 1];
+      if (i < segments.length - 1) {
+        const next = segments[i + 1];
         const cpx = curr.x;
         const cpy = curr.y;
         const ex = (curr.x + next.x) / 2;
@@ -333,18 +443,20 @@ export class PlantRenderer {
   update() {
     this.time += 0.016;
 
-    this.flowers.forEach(f => {
-      if (f.bloomProgress < f.targetBloom) {
-        f.bloomProgress += (f.targetBloom - f.bloomProgress) * 0.03;
-      }
-      f.rotation += Math.sin(this.time * 0.5) * 0.001;
-    });
+    for (const vine of this.vines.values()) {
+      vine.flowers.forEach(f => {
+        if (f.bloomProgress < f.targetBloom) {
+          f.bloomProgress += (f.targetBloom - f.bloomProgress) * 0.03;
+        }
+        f.rotation += Math.sin(this.time * 0.5) * 0.001;
+      });
 
-    this.leaves.forEach(l => {
-      if (l.growProgress < 1) {
-        l.growProgress += (1 - l.growProgress) * 0.04;
-      }
-    });
+      vine.leaves.forEach(l => {
+        if (l.growProgress < 1) {
+          l.growProgress += (1 - l.growProgress) * 0.04;
+        }
+      });
+    }
   }
 
   render() {
@@ -356,27 +468,30 @@ export class PlantRenderer {
     ctx.fillRect(0, 0, w, h);
 
     const sway = Math.sin(this.time * 0.3) * 0.5;
-    ctx.save();
 
-    if (this.stem) {
+    for (const vine of this.vines.values()) {
       ctx.save();
       const stemSway = sway * 0.002;
       ctx.transform(1, 0, stemSway, 1, 0, 0);
-      this.drawStem(this.stem);
+
+      this.drawSegments(vine.segments);
+
+      for (const branch of vine.branches) {
+        this.drawSegments(branch.segments);
+      }
+
       ctx.restore();
-    }
 
-    this.leaves.forEach(leaf => this.drawLeaf(leaf));
-    this.flowers.forEach(flower => this.drawFlower(flower));
+      vine.leaves.forEach(leaf => this.drawLeaf(leaf));
+      vine.flowers.forEach(flower => this.drawFlower(flower));
 
-    if (this.stem && this.stem.segments.length > 3) {
-      const tipSeg = this.stem.segments[this.stem.segments.length - 1];
-      if (this.flowers.length === 0 && this.leaves.length === 0) {
-        this.drawSmallBud(tipSeg.x, tipSeg.y - 3, 4);
+      if (vine.segments.length > 3) {
+        const tipSeg = vine.segments[vine.segments.length - 1];
+        if (vine.flowers.length === 0 && vine.leaves.length === 0) {
+          this.drawSmallBud(tipSeg.x, tipSeg.y - 3, 4);
+        }
       }
     }
-
-    ctx.restore();
   }
 
   startAnimation() {
@@ -395,8 +510,6 @@ export class PlantRenderer {
   }
 
   reset() {
-    this.stem = null;
-    this.flowers = [];
-    this.leaves = [];
+    this.vines.clear();
   }
 }
