@@ -105,7 +105,7 @@ export default function Garden() {
             zIndex: 10,
             textAlign: 'right',
           }}
-          className="text-[24px]">
+          className="text-left text-[24px]">
           {handsDetected > 0
             ? `${handsDetected} hand${handsDetected > 1 ? 's' : ''} detected`
             : 'Show your hands'}
