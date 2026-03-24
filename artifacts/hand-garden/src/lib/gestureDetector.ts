@@ -190,25 +190,22 @@ export class GestureDetector {
         history.fistStartTime = now;
       }
     } else if (history.wasFist && openness > OPEN_THRESHOLD) {
-      const delta = openness - history.lastOpenness;
       const fistDuration = now - history.fistStartTime;
 
-      if (delta > OPEN_DELTA_THRESHOLD && fistDuration > 150 && now - history.lastExtensionEmit > EXTENSION_COOLDOWN_MS) {
+      if (fistDuration > 150 && now - history.lastExtensionEmit > EXTENSION_COOLDOWN_MS) {
         history.lastExtensionEmit = now;
         history.wasFist = false;
         this.emit({
           type: 'fingerExtension',
           handIndex,
-          value: delta,
+          value: openness - FIST_THRESHOLD,
           position: {
             x: landmarks[MIDDLE_TIP].x,
             y: landmarks[MIDDLE_TIP].y,
           },
         });
       }
-    }
-
-    if (openness > FIST_THRESHOLD + 0.1) {
+    } else if (openness > OPEN_THRESHOLD) {
       history.wasFist = false;
     }
 

@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { PlantRenderer } from '../lib/plantRenderer';
 import { useHandTracking } from '../hooks/useHandTracking';
 import type { GestureEvent } from '../lib/gestureDetector';
-import { RotateIcon, BloomIcon, SwooshIcon, InfoIcon } from '../components/GestureIcons';
+import { RotateIcon, BloomIcon, SwooshIcon } from '../components/GestureIcons';
 
 const FONT = "'Cormorant Garamond', Georgia, serif";
 
@@ -135,14 +135,15 @@ export default function Garden() {
               fontSize: 16,
               display: 'flex',
               alignItems: 'center',
-              gap: 8,
+              gap: 10,
               transition: 'all 0.3s ease',
             }}
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(233, 232, 213, 0.15)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'rgba(233, 232, 213, 0.08)')}
           >
-            <InfoIcon size={18} opacity={0.8} />
-            <span style={{ opacity: 0.7 }}>Gestures</span>
+            <RotateIcon size={20} opacity={0.6} />
+            <BloomIcon size={20} opacity={0.6} />
+            <SwooshIcon size={20} opacity={0.6} />
           </button>
 
           {panelExpanded && (
