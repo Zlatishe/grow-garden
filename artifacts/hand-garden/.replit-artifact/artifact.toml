@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Hand Garden"
+version = "1.0.0"
+id = "artifacts/hand-garden"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22947
+
+[services.development]
+run = "pnpm --filter @workspace/hand-garden run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/hand-garden", "run", "build" ]
+publicDir = "artifacts/hand-garden/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22947"
+BASE_PATH = "/"

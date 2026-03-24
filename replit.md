@@ -50,6 +50,21 @@ Every package extends `tsconfig.base.json` which sets `composite: true`. The roo
 
 ## Packages
 
+### `artifacts/hand-garden` (`@workspace/hand-garden`)
+
+Interactive hand gesture plant-growing web app. Users grow botanical line-art illustrations using webcam-based hand tracking. Built with React + Vite, runs entirely in the browser.
+
+- **Hand tracking**: MediaPipe Hands (CDN-loaded WASM models) via `@mediapipe/hands` and `@mediapipe/camera_utils`
+- **Gesture detection**: Custom `GestureDetector` class (`src/lib/gestureDetector.ts`) detects wrist rotation, finger extension (fist→open), and horizontal swoosh gestures
+- **Plant rendering**: Canvas-based `PlantRenderer` class (`src/lib/plantRenderer.ts`) draws botanical line art (stems, flowers, leaves) in cream (#E9E8D5) on dark olive green (#33442A)
+- **Three gestures**:
+  - Wrist Rotation → spiral vine/stem grows upward
+  - Finger Extension → flower buds bloom with petals
+  - Swoosh left/right → leaves sprout on corresponding side
+- Entry: `src/main.tsx` → `src/App.tsx` → `src/pages/Garden.tsx`
+- No backend dependency — purely frontend
+- `pnpm --filter @workspace/hand-garden run dev` — start dev server
+
 ### `artifacts/api-server` (`@workspace/api-server`)
 
 Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` for request and response validation and `@workspace/db` for persistence.
