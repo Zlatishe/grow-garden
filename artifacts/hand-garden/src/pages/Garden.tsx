@@ -93,17 +93,19 @@ export default function Garden() {
         muted
       />
       {cameraState === 'active' && (
-        <div style={{
-          position: 'absolute',
-          bottom: 145,
-          right: 20,
-          color: '#E9E8D5',
-          fontSize: 16,
-          fontFamily: FONT,
-          opacity: 0.6,
-          zIndex: 10,
-          textAlign: 'right',
-        }}>
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 145,
+            right: 20,
+            color: '#E9E8D5',
+            fontSize: 16,
+            fontFamily: FONT,
+            opacity: 0.6,
+            zIndex: 10,
+            textAlign: 'right',
+          }}
+          className="text-[24px]">
           {handsDetected > 0
             ? `${handsDetected} hand${handsDetected > 1 ? 's' : ''} detected`
             : 'Show your hands'}
