@@ -322,7 +322,7 @@ export default function Garden() {
                   {item.icon}
                 </div>
                 <div>
-                  <div style={{ fontSize: 18, opacity: 0.9 }}>{item.gesture}</div>
+                  <div style={{ fontSize: 18, opacity: 0.9 }} className="text-[20px]">{item.gesture}</div>
                   <div style={{ fontSize: 16, opacity: 0.5, marginTop: 2 }}>{item.effect}</div>
                 </div>
               </div>
