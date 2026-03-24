@@ -97,15 +97,14 @@ export default function Garden() {
           style={{
             position: 'absolute',
             bottom: 145,
-            right: 20,
+            left: 20,
             color: '#E9E8D5',
-            fontSize: 16,
+            fontSize: 24,
             fontFamily: FONT,
             opacity: 0.6,
             zIndex: 10,
-            textAlign: 'right',
-          }}
-          className="text-left text-[24px]">
+            textAlign: 'left',
+          }}>
           {handsDetected > 0
             ? `${handsDetected} hand${handsDetected > 1 ? 's' : ''} detected`
             : 'Show your hands'}
@@ -169,7 +168,7 @@ export default function Garden() {
                     {item.icon}
                   </div>
                   <div>
-                    <div style={{ fontSize: 16, opacity: 0.9 }} className="text-[18px]">{item.gesture}</div>
+                    <div style={{ fontSize: 18, opacity: 0.9 }}>{item.gesture}</div>
                     <div style={{ fontSize: 16, opacity: 0.5, marginTop: 2 }}>{item.effect}</div>
                   </div>
                 </div>
@@ -324,7 +323,7 @@ export default function Garden() {
                   {item.icon}
                 </div>
                 <div>
-                  <div style={{ fontSize: 18, opacity: 0.9 }} className="text-[20px]">{item.gesture}</div>
+                  <div style={{ fontSize: 20, opacity: 0.9 }}>{item.gesture}</div>
                   <div style={{ fontSize: 16, opacity: 0.5, marginTop: 2 }}>{item.effect}</div>
                 </div>
               </div>
