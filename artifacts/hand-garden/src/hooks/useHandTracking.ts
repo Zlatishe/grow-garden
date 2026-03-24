@@ -13,6 +13,7 @@ export function useHandTracking(
   const gestureDetector = useRef(new GestureDetector());
   const cameraRef = useRef<Camera | null>(null);
   const handsRef = useRef<Hands | null>(null);
+  const destroyedRef = useRef(false);
   const [cameraState, setCameraState] = useState<CameraState>('idle');
   const [handsDetected, setHandsDetected] = useState(0);
 
@@ -29,6 +30,7 @@ export function useHandTracking(
     if (!videoRef.current || cameraState === 'active') return;
 
     setCameraState('requesting');
+    destroyedRef.current = false;
 
     try {
       const hands = new Hands({
@@ -45,6 +47,7 @@ export function useHandTracking(
       });
 
       hands.onResults((results: Results) => {
+        if (destroyedRef.current) return;
         if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
           setHandsDetected(results.multiHandLandmarks.length);
           gestureDetector.current.processHands(results.multiHandLandmarks);
@@ -57,8 +60,13 @@ export function useHandTracking(
 
       const camera = new Camera(videoRef.current, {
         onFrame: async () => {
+          if (destroyedRef.current) return;
           if (videoRef.current && handsRef.current) {
-            await handsRef.current.send({ image: videoRef.current });
+            try {
+              await handsRef.current.send({ image: videoRef.current });
+            } catch {
+              // Silently ignore errors from deleted WASM instances during cleanup
+            }
           }
         },
         width: 640,
@@ -86,11 +94,14 @@ export function useHandTracking(
 
   useEffect(() => {
     return () => {
+      destroyedRef.current = true;
       if (cameraRef.current) {
         cameraRef.current.stop();
+        cameraRef.current = null;
       }
       if (handsRef.current) {
         handsRef.current.close();
+        handsRef.current = null;
       }
     };
   }, []);
