@@ -4,7 +4,7 @@ import { useHandTracking } from '../hooks/useHandTracking';
 import type { GestureEvent } from '../lib/gestureDetector';
 import { RotateIcon, BloomIcon, SwooshIcon } from '../components/GestureIcons';
 
-const FONT = "'Cormorant Garamond', Georgia, serif";
+const FONT = "'Josefin Sans', sans-serif";
 
 export default function Garden() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -239,8 +239,8 @@ export default function Garden() {
         }}>
           <h1 style={{
             fontSize: 48,
-            fontWeight: 300,
-            letterSpacing: 6,
+            fontWeight: 200,
+            letterSpacing: 8,
             marginBottom: 12,
             textTransform: 'uppercase',
           }}>
@@ -286,8 +286,8 @@ export default function Garden() {
             color: '#E9E8D5',
             fontFamily: FONT,
             fontSize: 42,
-            fontWeight: 300,
-            letterSpacing: 6,
+            fontWeight: 200,
+            letterSpacing: 8,
             marginBottom: 8,
             textTransform: 'uppercase',
           }}>
@@ -298,6 +298,8 @@ export default function Garden() {
             color: '#E9E8D5',
             fontFamily: FONT,
             fontSize: 18,
+            fontWeight: 300,
+            fontStyle: 'italic',
             opacity: 0.5,
             marginBottom: 50,
             letterSpacing: 2,
