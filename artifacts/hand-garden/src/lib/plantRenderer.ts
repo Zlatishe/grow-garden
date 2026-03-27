@@ -14,12 +14,10 @@ interface Branch {
   maxLength: number;
   growthProgress: number;
   targetAngle: number;
-  side: number;
   depth: number;
   curveSeed: number;
   currentAngle: number;
   segsSinceSubBranch: number;
-  thicknessRatio: number;
 }
 
 interface Flower {
@@ -194,12 +192,10 @@ export class PlantRenderer {
       maxLength: maxLen,
       growthProgress: 0,
       targetAngle,
-      side,
       depth,
       curveSeed: Math.random() * Math.PI * 2,
       currentAngle: startAngle,
       segsSinceSubBranch: 0,
-      thicknessRatio,
     };
 
     vine.branches.push(branch);
