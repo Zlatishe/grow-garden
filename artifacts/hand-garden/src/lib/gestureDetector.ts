@@ -4,6 +4,12 @@ export interface HandLandmark {
   z: number;
 }
 
+export interface HandednessInfo {
+  label: string;
+  score: number;
+  index?: number;
+}
+
 export type GestureType = 'wristRotation' | 'openPalm' | 'pinch';
 
 export interface GestureEvent {
@@ -29,19 +35,26 @@ const MIDDLE_MCP = 9;
 const RING_MCP = 13;
 const PINKY_MCP = 17;
 
-const ROTATION_ANGLE_THRESHOLD = Math.PI * 1.4;
-const ROTATION_RADIUS_THRESHOLD = 0.035;
-const ROTATION_MIN_POSITIONS = 10;
-const ROTATION_WINDOW_MS = 1500;
-const ROTATION_COOLDOWN_MS = 600;
-const FIST_OPENNESS_THRESHOLD = 1.1;
+const ROTATION_ANGLE_THRESHOLD = Math.PI * 1.2;
+const ROTATION_RADIUS_THRESHOLD = 0.03;
+const ROTATION_MIN_POSITIONS = 7;
+const ROTATION_WINDOW_MS = 1800;
+const ROTATION_COOLDOWN_MS = 500;
+const FIST_OPENNESS_THRESHOLD = 1.15;
 
 const PALM_CLOSE_THRESHOLD = 1.1;
 const PALM_OPEN_THRESHOLD = 1.45;
 const PALM_BLOOM_COOLDOWN_MS = 800;
 
-const PINCH_DISTANCE_THRESHOLD = 0.045;
+const PINCH_DISTANCE_THRESHOLD = 0.05;
 const PINCH_EMIT_INTERVAL_MS = 1000;
+
+const SMOOTH_FACTOR = 0.4;
+
+interface SmoothedPosition {
+  x: number;
+  y: number;
+}
 
 interface HandHistory {
   wristPositions: { x: number; y: number; time: number }[];
@@ -52,6 +65,8 @@ interface HandHistory {
   lastBloomEmit: number;
 
   lastPinchEmit: number;
+
+  smoothedPos: SmoothedPosition | null;
 }
 
 export class GestureDetector {
@@ -78,22 +93,42 @@ export class GestureDetector {
         palmWasClosed: false,
         lastBloomEmit: 0,
         lastPinchEmit: 0,
+        smoothedPos: null,
       });
     }
     return this.handHistories.get(handIndex)!;
   }
 
-  processHands(multiHandLandmarks: HandLandmark[][]) {
+  private resolveStableIndex(
+    rawIndex: number,
+    handedness?: HandednessInfo[]
+  ): number {
+    if (!handedness || handedness.length === 0) return rawIndex;
+
+    const entry = handedness[rawIndex];
+    if (!entry) return rawIndex;
+
+    const label = entry.label.toLowerCase();
+    if (label === 'left') return 0;
+    if (label === 'right') return 1;
+    return rawIndex;
+  }
+
+  processHands(
+    multiHandLandmarks: HandLandmark[][],
+    multiHandedness?: HandednessInfo[]
+  ) {
     const activeHands = new Set<number>();
 
-    multiHandLandmarks.forEach((landmarks, handIndex) => {
-      activeHands.add(handIndex);
-      const history = this.getHistory(handIndex);
+    multiHandLandmarks.forEach((landmarks, rawIndex) => {
+      const stableIndex = this.resolveStableIndex(rawIndex, multiHandedness);
+      activeHands.add(stableIndex);
+      const history = this.getHistory(stableIndex);
       const now = Date.now();
 
-      this.detectFistRotation(landmarks, handIndex, history, now);
-      this.detectPalmOpenClose(landmarks, handIndex, history, now);
-      this.detectPinch(landmarks, handIndex, history, now);
+      this.detectFistRotation(landmarks, stableIndex, history, now);
+      this.detectPalmOpenClose(landmarks, stableIndex, history, now);
+      this.detectPinch(landmarks, stableIndex, history, now);
     });
 
     for (const [key] of this.handHistories) {
@@ -101,6 +136,20 @@ export class GestureDetector {
         this.handHistories.delete(key);
       }
     }
+  }
+
+  private smoothPosition(
+    history: HandHistory,
+    rawX: number,
+    rawY: number
+  ): { x: number; y: number } {
+    if (!history.smoothedPos) {
+      history.smoothedPos = { x: rawX, y: rawY };
+      return { x: rawX, y: rawY };
+    }
+    history.smoothedPos.x += (rawX - history.smoothedPos.x) * SMOOTH_FACTOR;
+    history.smoothedPos.y += (rawY - history.smoothedPos.y) * SMOOTH_FACTOR;
+    return { x: history.smoothedPos.x, y: history.smoothedPos.y };
   }
 
   private computeOpenness(landmarks: HandLandmark[]): number {
@@ -147,9 +196,10 @@ export class GestureDetector {
 
     const wrist = landmarks[WRIST];
     const middleMcp = landmarks[MIDDLE_MCP];
-    const cx = (wrist.x + middleMcp.x) / 2;
-    const cy = (wrist.y + middleMcp.y) / 2;
-    const pos = { x: cx, y: cy, time: now };
+    const rawX = (wrist.x + middleMcp.x) / 2;
+    const rawY = (wrist.y + middleMcp.y) / 2;
+    const smoothed = this.smoothPosition(history, rawX, rawY);
+    const pos = { x: smoothed.x, y: smoothed.y, time: now };
 
     history.wristPositions.push(pos);
 
@@ -187,7 +237,7 @@ export class GestureDetector {
           value: absAngle,
           position: { x: centerX, y: centerY },
         });
-        history.wristPositions = history.wristPositions.slice(-4);
+        history.wristPositions = history.wristPositions.slice(-3);
       }
     }
   }

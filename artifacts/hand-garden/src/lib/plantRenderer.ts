@@ -44,6 +44,7 @@ interface Vine {
   flowers: Flower[];
   leaves: Leaf[];
   nextLeafSide: 'left' | 'right';
+  lastAngle: number;
 }
 
 export class PlantRenderer {
@@ -111,7 +112,7 @@ export class PlantRenderer {
     if (!this.vines.has(handIndex)) {
       const baseX = this.getVineBaseX(handIndex);
       this.vines.set(handIndex, {
-        segments: [{ x: baseX, y: window.innerHeight - 40, angle: -Math.PI / 2, thickness: 2.5 }],
+        segments: [{ x: baseX, y: window.innerHeight - 40, angle: -Math.PI / 2, thickness: 2.8 }],
         branches: [],
         baseX,
         growthProgress: 0,
@@ -120,6 +121,7 @@ export class PlantRenderer {
         flowers: [],
         leaves: [],
         nextLeafSide: 'left',
+        lastAngle: -Math.PI / 2,
       });
     }
     return this.vines.get(handIndex)!;
@@ -129,26 +131,30 @@ export class PlantRenderer {
     const vine = this.ensureVine(handIndex);
     const last = vine.segments[vine.segments.length - 1];
 
-    vine.spiralAngle += rotationAmount * 1.5;
-    const spiralInfluence = Math.sin(vine.spiralAngle) * 0.3;
+    const clampedRotation = Math.min(rotationAmount, 0.6);
+    vine.spiralAngle += clampedRotation * 0.6;
+    const spiralInfluence = Math.sin(vine.spiralAngle) * 0.12;
 
-    const segmentLength = 6 + Math.random() * 3;
+    const segmentLength = 9 + Math.random() * 5;
     const baseAngle = -Math.PI / 2;
-    const wobble = (Math.random() - 0.5) * 0.15;
-    const newAngle = baseAngle + spiralInfluence + wobble;
+    const wobble = (Math.random() - 0.5) * 0.06;
+    const targetAngle = baseAngle + spiralInfluence + wobble;
+
+    const smoothedAngle = vine.lastAngle + (targetAngle - vine.lastAngle) * 0.35;
+    vine.lastAngle = smoothedAngle;
 
     const maxHeight = 80;
     if (last.y < maxHeight) return;
 
-    const newX = last.x + Math.cos(newAngle) * segmentLength;
-    const newY = last.y + Math.sin(newAngle) * segmentLength;
+    const newX = last.x + Math.cos(smoothedAngle) * segmentLength;
+    const newY = last.y + Math.sin(smoothedAngle) * segmentLength;
 
-    const thickness = Math.max(0.8, 2.5 - vine.segments.length * 0.015);
+    const thickness = Math.max(1.0, 2.8 - vine.segments.length * 0.012);
 
     vine.segments.push({
       x: newX,
       y: newY,
-      angle: newAngle,
+      angle: smoothedAngle,
       thickness,
     });
 
@@ -165,26 +171,31 @@ export class PlantRenderer {
   private spawnBranch(vine: Vine, segIdx: number) {
     const seg = vine.segments[segIdx];
     const side = Math.random() > 0.5 ? 1 : -1;
-    const branchAngle = seg.angle + side * (Math.PI / 4 + Math.random() * Math.PI / 6);
-    const maxLen = 3 + Math.floor(Math.random() * 5);
+    const branchAngle = seg.angle + side * (Math.PI / 4 + Math.random() * Math.PI / 8);
+    const maxLen = 3 + Math.floor(Math.random() * 4);
 
     const branch: Branch = {
-      segments: [{ x: seg.x, y: seg.y, angle: branchAngle, thickness: seg.thickness * 0.6 }],
+      segments: [{ x: seg.x, y: seg.y, angle: branchAngle, thickness: seg.thickness * 0.65 }],
       angle: branchAngle,
       maxLength: maxLen,
       growthProgress: 0,
     };
 
+    let currentAngle = branchAngle;
     for (let i = 0; i < maxLen; i++) {
       const prev = branch.segments[branch.segments.length - 1];
-      const bLen = 4 + Math.random() * 2;
-      const wobble = (Math.random() - 0.5) * 0.2;
-      const a = branchAngle + wobble;
+      const bLen = 6 + Math.random() * 4;
+      const drift = (Math.random() - 0.5) * 0.08;
+      currentAngle += drift;
+      const gravity = 0.02;
+      if (currentAngle < -Math.PI) currentAngle += gravity;
+      else if (currentAngle > 0) currentAngle -= gravity;
+
       branch.segments.push({
-        x: prev.x + Math.cos(a) * bLen,
-        y: prev.y + Math.sin(a) * bLen,
-        angle: a,
-        thickness: Math.max(0.5, prev.thickness * 0.85),
+        x: prev.x + Math.cos(currentAngle) * bLen,
+        y: prev.y + Math.sin(currentAngle) * bLen,
+        angle: currentAngle,
+        thickness: Math.max(0.5, prev.thickness * 0.82),
       });
     }
 
@@ -268,6 +279,17 @@ export class PlantRenderer {
     return points;
   }
 
+  private catmullRomPoint(
+    p0: StemSegment, p1: StemSegment, p2: StemSegment, p3: StemSegment, t: number
+  ): { x: number; y: number } {
+    const t2 = t * t;
+    const t3 = t2 * t;
+    return {
+      x: 0.5 * ((2 * p1.x) + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3),
+      y: 0.5 * ((2 * p1.y) + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3),
+    };
+  }
+
   private drawSegments(segments: StemSegment[]) {
     const ctx = this.ctx;
     if (segments.length < 2) return;
@@ -276,27 +298,49 @@ export class PlantRenderer {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    for (let i = 1; i < segments.length; i++) {
-      const prev = segments[i - 1];
-      const curr = segments[i];
-
-      ctx.beginPath();
-      ctx.lineWidth = curr.thickness;
-      ctx.globalAlpha = Math.min(1, 0.6 + (i / segments.length) * 0.4);
-      ctx.moveTo(prev.x, prev.y);
-
-      if (i < segments.length - 1) {
-        const next = segments[i + 1];
-        const cpx = curr.x;
-        const cpy = curr.y;
-        const ex = (curr.x + next.x) / 2;
-        const ey = (curr.y + next.y) / 2;
-        ctx.quadraticCurveTo(cpx, cpy, ex, ey);
-      } else {
+    if (segments.length <= 3) {
+      for (let i = 1; i < segments.length; i++) {
+        const prev = segments[i - 1];
+        const curr = segments[i];
+        ctx.beginPath();
+        ctx.lineWidth = curr.thickness;
+        ctx.globalAlpha = Math.min(1, 0.6 + (i / segments.length) * 0.4);
+        ctx.moveTo(prev.x, prev.y);
         ctx.lineTo(curr.x, curr.y);
+        ctx.stroke();
       }
+      ctx.globalAlpha = 1;
+      return;
+    }
 
-      ctx.stroke();
+    const stepsPerSegment = 6;
+    for (let i = 0; i < segments.length - 1; i++) {
+      const p0 = segments[Math.max(0, i - 1)];
+      const p1 = segments[i];
+      const p2 = segments[i + 1];
+      const p3 = segments[Math.min(segments.length - 1, i + 2)];
+
+      const startThick = p1.thickness;
+      const endThick = p2.thickness;
+      const progress = i / (segments.length - 1);
+      const alpha = Math.min(1, 0.6 + progress * 0.4);
+
+      ctx.globalAlpha = alpha;
+
+      let prevPt = this.catmullRomPoint(p0, p1, p2, p3, 0);
+      for (let s = 1; s <= stepsPerSegment; s++) {
+        const t = s / stepsPerSegment;
+        const pt = this.catmullRomPoint(p0, p1, p2, p3, t);
+        const thick = startThick + (endThick - startThick) * t;
+
+        ctx.beginPath();
+        ctx.lineWidth = thick;
+        ctx.moveTo(prevPt.x, prevPt.y);
+        ctx.lineTo(pt.x, pt.y);
+        ctx.stroke();
+
+        prevPt = pt;
+      }
     }
     ctx.globalAlpha = 1;
   }

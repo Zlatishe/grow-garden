@@ -50,7 +50,15 @@ export function useHandTracking(
         if (destroyedRef.current) return;
         if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
           setHandsDetected(results.multiHandLandmarks.length);
-          gestureDetector.current.processHands(results.multiHandLandmarks);
+          const handedness = results.multiHandedness?.map((h: any) => ({
+            label: h.label as string,
+            score: h.score as number,
+            index: h.index as number | undefined,
+          }));
+          gestureDetector.current.processHands(
+            results.multiHandLandmarks,
+            handedness
+          );
         } else {
           setHandsDetected(0);
         }
@@ -65,7 +73,6 @@ export function useHandTracking(
             try {
               await handsRef.current.send({ image: videoRef.current });
             } catch {
-              // Silently ignore errors from deleted WASM instances during cleanup
             }
           }
         },
