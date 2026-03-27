@@ -41,11 +41,13 @@ const ROTATION_MIN_POSITIONS_1H = 7;
 const ROTATION_MIN_POSITIONS_2H = 6;
 const ROTATION_WINDOW_MS = 1800;
 const ROTATION_COOLDOWN_MS = 500;
-const FIST_OPENNESS_THRESHOLD = 1.15;
+const FIST_OPENNESS_THRESHOLD = 1.0;
 
-const PALM_CLOSE_THRESHOLD = 1.1;
-const PALM_OPEN_THRESHOLD = 1.45;
+const PALM_CLOSE_THRESHOLD = 1.25;
+const PALM_OPEN_THRESHOLD = 1.55;
 const PALM_BLOOM_COOLDOWN_MS = 800;
+
+const ROTATION_ACTIVE_SUPPRESS_BLOOM = true;
 
 const PINCH_DISTANCE_THRESHOLD = 0.05;
 const PINCH_EMIT_INTERVAL_MS = 1000;
@@ -61,6 +63,9 @@ interface HandHistory {
   wristPositions: { x: number; y: number; time: number }[];
   rotationAngle: number;
   lastRotationEmit: number;
+  rotationActive: boolean;
+
+  wristRollAngles: { angle: number; time: number }[];
 
   palmWasClosed: boolean;
   lastBloomEmit: number;
@@ -92,6 +97,8 @@ export class GestureDetector {
         wristPositions: [],
         rotationAngle: 0,
         lastRotationEmit: 0,
+        rotationActive: false,
+        wristRollAngles: [],
         palmWasClosed: false,
         lastBloomEmit: 0,
         lastPinchEmit: 0,
@@ -220,6 +227,12 @@ export class GestureDetector {
     return tipDist > dipDist && tipDist > mcpDist * 1.1;
   }
 
+  private computeWristRollAngle(landmarks: HandLandmark[]): number {
+    const wrist = landmarks[WRIST];
+    const middleMcp = landmarks[MIDDLE_MCP];
+    return Math.atan2(middleMcp.y - wrist.y, middleMcp.x - wrist.x);
+  }
+
   private detectFistRotation(
     landmarks: HandLandmark[],
     handIndex: number,
@@ -229,8 +242,18 @@ export class GestureDetector {
     const openness = this.computeOpenness(landmarks);
     if (openness > FIST_OPENNESS_THRESHOLD) {
       history.wristPositions = [];
+      history.wristRollAngles = [];
+      history.rotationActive = false;
       return;
     }
+
+    history.rotationActive = true;
+
+    const rollAngle = this.computeWristRollAngle(landmarks);
+    history.wristRollAngles.push({ angle: rollAngle, time: now });
+
+    const rollCutoff = now - ROTATION_WINDOW_MS;
+    history.wristRollAngles = history.wristRollAngles.filter(r => r.time > rollCutoff);
 
     const wrist = landmarks[WRIST];
     const middleMcp = landmarks[MIDDLE_MCP];
@@ -247,6 +270,17 @@ export class GestureDetector {
     const minPositions = this.currentHandCount >= 2 ? ROTATION_MIN_POSITIONS_2H : ROTATION_MIN_POSITIONS_1H;
     if (history.wristPositions.length < minPositions) return;
 
+    let totalRollAngle = 0;
+    const rollAngles = history.wristRollAngles;
+    if (rollAngles.length >= 3) {
+      for (let i = 1; i < rollAngles.length; i++) {
+        let diff = rollAngles[i].angle - rollAngles[i - 1].angle;
+        if (diff > Math.PI) diff -= 2 * Math.PI;
+        if (diff < -Math.PI) diff += 2 * Math.PI;
+        totalRollAngle += diff;
+      }
+    }
+
     const positions = history.wristPositions;
     const centerX = positions.reduce((s, p) => s + p.x, 0) / positions.length;
     const centerY = positions.reduce((s, p) => s + p.y, 0) / positions.length;
@@ -261,22 +295,28 @@ export class GestureDetector {
       totalAngle += diff;
     }
 
-    const absAngle = Math.abs(totalAngle);
-    if (absAngle > ROTATION_ANGLE_THRESHOLD) {
+    const absCircularAngle = Math.abs(totalAngle);
+    const absRollAngle = Math.abs(totalRollAngle);
+    const combinedAngle = Math.max(absCircularAngle, absRollAngle);
+
+    if (combinedAngle > ROTATION_ANGLE_THRESHOLD) {
       const radius = positions.reduce((s, p) => {
         return s + Math.sqrt((p.x - centerX) ** 2 + (p.y - centerY) ** 2);
       }, 0) / positions.length;
 
-      if (radius > ROTATION_RADIUS_THRESHOLD && now - history.lastRotationEmit > ROTATION_COOLDOWN_MS) {
-        history.rotationAngle += absAngle;
+      const passesRadius = radius > ROTATION_RADIUS_THRESHOLD || absRollAngle > ROTATION_ANGLE_THRESHOLD;
+
+      if (passesRadius && now - history.lastRotationEmit > ROTATION_COOLDOWN_MS) {
+        history.rotationAngle += combinedAngle;
         history.lastRotationEmit = now;
         this.emit({
           type: 'wristRotation',
           handIndex,
-          value: absAngle,
+          value: combinedAngle,
           position: { x: centerX, y: centerY },
         });
         history.wristPositions = history.wristPositions.slice(-3);
+        history.wristRollAngles = history.wristRollAngles.slice(-3);
       }
     }
   }
@@ -291,6 +331,10 @@ export class GestureDetector {
 
     if (openness < PALM_CLOSE_THRESHOLD) {
       history.palmWasClosed = true;
+      return;
+    }
+
+    if (ROTATION_ACTIVE_SUPPRESS_BLOOM && history.rotationActive) {
       return;
     }
 
