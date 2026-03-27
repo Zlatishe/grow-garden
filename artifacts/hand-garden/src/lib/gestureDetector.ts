@@ -113,11 +113,11 @@ export class GestureDetector {
       return mapping;
     }
 
-    const assignments: { rawIndex: number; label: string; score: number }[] = [];
+    const assignments: { rawIndex: number; label: string; score: number; sourceIndex?: number }[] = [];
     for (let i = 0; i < count; i++) {
       const entry = handedness[i];
       if (entry) {
-        assignments.push({ rawIndex: i, label: entry.label.toLowerCase(), score: entry.score });
+        assignments.push({ rawIndex: i, label: entry.label.toLowerCase(), score: entry.score, sourceIndex: entry.index });
       } else {
         assignments.push({ rawIndex: i, label: '', score: 0 });
       }
@@ -128,9 +128,15 @@ export class GestureDetector {
     const sorted = [...assignments].sort((a, b) => b.score - a.score);
     for (const a of sorted) {
       let stableIdx: number;
-      if (a.label === 'left') stableIdx = 0;
-      else if (a.label === 'right') stableIdx = 1;
-      else stableIdx = a.rawIndex;
+      if (a.sourceIndex !== undefined && a.sourceIndex >= 0 && a.sourceIndex <= 1) {
+        stableIdx = a.label === 'left' ? 0 : a.label === 'right' ? 1 : a.sourceIndex;
+      } else if (a.label === 'left') {
+        stableIdx = 0;
+      } else if (a.label === 'right') {
+        stableIdx = 1;
+      } else {
+        stableIdx = a.rawIndex;
+      }
 
       if (usedStable.has(stableIdx)) {
         stableIdx = stableIdx === 0 ? 1 : 0;
