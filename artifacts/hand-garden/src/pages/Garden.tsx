@@ -6,6 +6,29 @@ import { VineGrowIcon, FlowerBloomIcon, LeafSproutIcon } from '../components/Ges
 
 const FONT = "'Josefin Sans', sans-serif";
 
+const TYPE_SCALE = {
+  xs:   { mobile: 14, tablet: 15, desktop: 16 },
+  sm:   { mobile: 15, tablet: 16, desktop: 17 },
+  base: { mobile: 16, tablet: 17, desktop: 18 },
+  lg:   { mobile: 18, tablet: 20, desktop: 20 },
+  xl:   { mobile: 20, tablet: 22, desktop: 24 },
+  '2xl': { mobile: 28, tablet: 32, desktop: 36 },
+  '3xl': { mobile: 42, tablet: 48, desktop: 52 },
+} as const;
+
+type ScaleStep = keyof typeof TYPE_SCALE;
+type Tier = 'mobile' | 'tablet' | 'desktop';
+
+function getTier(windowWidth: number): Tier {
+  if (windowWidth > 1024) return 'desktop';
+  if (windowWidth >= 480) return 'tablet';
+  return 'mobile';
+}
+
+function ts(tier: Tier, step: ScaleStep): number {
+  return TYPE_SCALE[step][tier];
+}
+
 interface GestureToast {
   type: GestureType;
   key: number;
@@ -49,6 +72,7 @@ export default function Garden() {
 
   const isDesktop = windowWidth > 1024;
   const isTablet = windowWidth >= 480 && windowWidth <= 1024;
+  const tier = getTier(windowWidth);
 
   const handleGesture = useCallback((event: GestureEvent) => {
     const renderer = rendererRef.current;
@@ -191,7 +215,7 @@ export default function Garden() {
             bottom: `calc(max(80px, calc(20px + env(safe-area-inset-bottom, 60px))) + ${typeof cameraHeight === 'number' ? cameraHeight + 'px' : cameraHeight} + 8px)`,
             right: 'max(16px, env(safe-area-inset-right, 0px))',
             color: '#E9E8D5',
-            fontSize: isDesktop ? 18 : 20,
+            fontSize: ts(tier, 'base'),
             fontFamily: FONT,
             opacity: 0.6,
             zIndex: 10,
@@ -216,7 +240,7 @@ export default function Garden() {
             gap: 8,
             color: '#E9E8D5',
             fontFamily: FONT,
-            fontSize: 15,
+            fontSize: ts(tier, 'sm'),
             background: 'rgba(51, 68, 42, 0.85)',
             border: '1px solid rgba(233, 232, 213, 0.15)',
             borderRadius: 8,
@@ -265,8 +289,8 @@ export default function Garden() {
                     {item.icon}
                   </div>
                   <div>
-                    <div style={{ fontSize: 16, opacity: 0.85 }}>{item.label}</div>
-                    <div style={{ fontSize: 13, opacity: 0.4, marginTop: 1 }}>{item.description}</div>
+                    <div style={{ fontSize: ts(tier, 'base'), opacity: 0.85 }}>{item.label}</div>
+                    <div style={{ fontSize: ts(tier, 'xs'), opacity: 0.4, marginTop: 1 }}>{item.description}</div>
                   </div>
                 </div>
               ))}
@@ -283,7 +307,7 @@ export default function Garden() {
                   padding: '10px 16px',
                   cursor: 'pointer',
                   fontFamily: FONT,
-                  fontSize: 16,
+                  fontSize: ts(tier, 'base'),
                   display: 'flex',
                   alignItems: 'center',
                   gap: 12,
@@ -325,8 +349,8 @@ export default function Garden() {
                         {item.icon}
                       </div>
                       <div>
-                        <div style={{ fontSize: isTablet ? 18 : 17, opacity: 0.9 }}>{item.label}</div>
-                        <div style={{ fontSize: isTablet ? 15 : 14, opacity: 0.5, marginTop: 2 }}>{item.description}</div>
+                        <div style={{ fontSize: ts(tier, 'lg'), opacity: 0.9 }}>{item.label}</div>
+                        <div style={{ fontSize: ts(tier, 'xs'), opacity: 0.5, marginTop: 2 }}>{item.description}</div>
                       </div>
                     </div>
                   ))}
@@ -349,8 +373,8 @@ export default function Garden() {
           zIndex: 20,
           padding: '0 24px',
         }}>
-          <p style={{ fontSize: 20, marginBottom: 16 }}>Camera access is needed</p>
-          <p style={{ fontSize: 16, opacity: 0.7 }}>
+          <p style={{ fontSize: ts(tier, 'xl'), marginBottom: 16 }}>Camera access is needed</p>
+          <p style={{ fontSize: ts(tier, 'base'), opacity: 0.7 }}>
             Please allow camera access in your browser settings and reload the page.
           </p>
         </div>
@@ -368,8 +392,8 @@ export default function Garden() {
           zIndex: 20,
           padding: '0 24px',
         }}>
-          <p style={{ fontSize: 20, marginBottom: 16 }}>Something went wrong</p>
-          <p style={{ fontSize: 16, opacity: 0.7, marginBottom: 24 }}>
+          <p style={{ fontSize: ts(tier, 'xl'), marginBottom: 16 }}>Something went wrong</p>
+          <p style={{ fontSize: ts(tier, 'base'), opacity: 0.7, marginBottom: 24 }}>
             Could not access the camera. Please check your device.
           </p>
           <button
@@ -382,7 +406,7 @@ export default function Garden() {
               borderRadius: 4,
               cursor: 'pointer',
               fontFamily: FONT,
-              fontSize: 16,
+              fontSize: ts(tier, 'base'),
             }}
           >
             Try Again
@@ -403,7 +427,7 @@ export default function Garden() {
           padding: '0 24px',
         }}>
           <h1 style={{
-            fontSize: 'min(48px, 10vw)',
+            fontSize: ts(tier, '3xl'),
             fontWeight: 200,
             letterSpacing: 8,
             marginBottom: 12,
@@ -412,7 +436,7 @@ export default function Garden() {
             Hand Garden
           </h1>
           <p style={{
-            fontSize: 'min(18px, 4vw)',
+            fontSize: ts(tier, 'lg'),
             opacity: 0.6,
             letterSpacing: 2,
             marginBottom: 24,
@@ -420,7 +444,7 @@ export default function Garden() {
             Grow plants with your hands
           </p>
           <p style={{
-            fontSize: 16,
+            fontSize: ts(tier, 'base'),
             opacity: 0.5,
           }}>
             {cameraState === 'requesting'
@@ -453,7 +477,7 @@ export default function Garden() {
           <h1 style={{
             color: '#E9E8D5',
             fontFamily: FONT,
-            fontSize: isDesktop ? 52 : 'min(42px, 9vw)',
+            fontSize: ts(tier, '3xl'),
             fontWeight: 200,
             letterSpacing: 8,
             marginBottom: 8,
@@ -465,7 +489,7 @@ export default function Garden() {
           <p style={{
             color: '#E9E8D5',
             fontFamily: FONT,
-            fontSize: isDesktop ? 20 : 'min(18px, 4vw)',
+            fontSize: ts(tier, 'lg'),
             fontWeight: 300,
             fontStyle: 'italic',
             opacity: 0.5,
@@ -505,13 +529,13 @@ export default function Garden() {
                 </div>
                 <div>
                   <div style={{
-                    fontSize: isDesktop ? 22 : isTablet ? 20 : 'min(20px, 4.5vw)',
+                    fontSize: ts(tier, 'xl'),
                     opacity: 0.9,
                     fontWeight: 300,
                     letterSpacing: 2,
                   }}>{item.label}</div>
                   <div style={{
-                    fontSize: isDesktop ? 14 : isTablet ? 15 : 'min(14px, 3.2vw)',
+                    fontSize: ts(tier, 'xs'),
                     opacity: 0.45,
                     marginTop: 3,
                   }}>{item.description}</div>
@@ -523,7 +547,7 @@ export default function Garden() {
           <p style={{
             color: '#E9E8D5',
             fontFamily: FONT,
-            fontSize: 16,
+            fontSize: ts(tier, 'base'),
             opacity: 0.4,
             marginTop: isDesktop ? 60 : 50,
           }}>
