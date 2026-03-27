@@ -101,19 +101,46 @@ export class GestureDetector {
     return this.handHistories.get(handIndex)!;
   }
 
-  private resolveStableIndex(
-    rawIndex: number,
-    handedness?: HandednessInfo[]
-  ): number {
-    if (!handedness || handedness.length === 0) return rawIndex;
+  private resolveStableIndices(
+    handedness?: HandednessInfo[],
+    handCount?: number
+  ): Map<number, number> {
+    const mapping = new Map<number, number>();
+    const count = handCount || 0;
 
-    const entry = handedness[rawIndex];
-    if (!entry) return rawIndex;
+    if (!handedness || handedness.length === 0 || count === 0) {
+      for (let i = 0; i < count; i++) mapping.set(i, i);
+      return mapping;
+    }
 
-    const label = entry.label.toLowerCase();
-    if (label === 'left') return 0;
-    if (label === 'right') return 1;
-    return rawIndex;
+    const assignments: { rawIndex: number; label: string; score: number }[] = [];
+    for (let i = 0; i < count; i++) {
+      const entry = handedness[i];
+      if (entry) {
+        assignments.push({ rawIndex: i, label: entry.label.toLowerCase(), score: entry.score });
+      } else {
+        assignments.push({ rawIndex: i, label: '', score: 0 });
+      }
+    }
+
+    const usedStable = new Set<number>();
+
+    const sorted = [...assignments].sort((a, b) => b.score - a.score);
+    for (const a of sorted) {
+      let stableIdx: number;
+      if (a.label === 'left') stableIdx = 0;
+      else if (a.label === 'right') stableIdx = 1;
+      else stableIdx = a.rawIndex;
+
+      if (usedStable.has(stableIdx)) {
+        stableIdx = stableIdx === 0 ? 1 : 0;
+      }
+
+      usedStable.add(stableIdx);
+      mapping.set(a.rawIndex, stableIdx);
+    }
+
+    return mapping;
   }
 
   processHands(
@@ -123,8 +150,10 @@ export class GestureDetector {
     const activeHands = new Set<number>();
     this.currentHandCount = multiHandLandmarks.length;
 
+    const indexMap = this.resolveStableIndices(multiHandedness, multiHandLandmarks.length);
+
     multiHandLandmarks.forEach((landmarks, rawIndex) => {
-      const stableIndex = this.resolveStableIndex(rawIndex, multiHandedness);
+      const stableIndex = indexMap.get(rawIndex) ?? rawIndex;
       activeHands.add(stableIndex);
       const history = this.getHistory(stableIndex);
       const now = Date.now();
