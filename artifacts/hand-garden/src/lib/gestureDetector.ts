@@ -37,7 +37,8 @@ const PINKY_MCP = 17;
 
 const ROTATION_ANGLE_THRESHOLD = Math.PI * 1.2;
 const ROTATION_RADIUS_THRESHOLD = 0.03;
-const ROTATION_MIN_POSITIONS = 7;
+const ROTATION_MIN_POSITIONS_1H = 7;
+const ROTATION_MIN_POSITIONS_2H = 6;
 const ROTATION_WINDOW_MS = 1800;
 const ROTATION_COOLDOWN_MS = 500;
 const FIST_OPENNESS_THRESHOLD = 1.15;
@@ -72,6 +73,7 @@ interface HandHistory {
 export class GestureDetector {
   private handHistories: Map<number, HandHistory> = new Map();
   private listeners: ((event: GestureEvent) => void)[] = [];
+  private currentHandCount: number = 1;
 
   onGesture(callback: (event: GestureEvent) => void) {
     this.listeners.push(callback);
@@ -119,6 +121,7 @@ export class GestureDetector {
     multiHandedness?: HandednessInfo[]
   ) {
     const activeHands = new Set<number>();
+    this.currentHandCount = multiHandLandmarks.length;
 
     multiHandLandmarks.forEach((landmarks, rawIndex) => {
       const stableIndex = this.resolveStableIndex(rawIndex, multiHandedness);
@@ -206,7 +209,8 @@ export class GestureDetector {
     const cutoff = now - ROTATION_WINDOW_MS;
     history.wristPositions = history.wristPositions.filter(p => p.time > cutoff);
 
-    if (history.wristPositions.length < ROTATION_MIN_POSITIONS) return;
+    const minPositions = this.currentHandCount >= 2 ? ROTATION_MIN_POSITIONS_2H : ROTATION_MIN_POSITIONS_1H;
+    if (history.wristPositions.length < minPositions) return;
 
     const positions = history.wristPositions;
     const centerX = positions.reduce((s, p) => s + p.x, 0) / positions.length;
