@@ -21,7 +21,6 @@ export interface GestureEvent {
 
 const WRIST = 0;
 const THUMB_TIP = 4;
-const THUMB_IP = 3;
 const INDEX_TIP = 8;
 const INDEX_DIP = 7;
 const MIDDLE_TIP = 12;
@@ -46,8 +45,7 @@ const FIST_OPENNESS_THRESHOLD = 1.0;
 const PALM_CLOSE_THRESHOLD = 1.25;
 const PALM_OPEN_THRESHOLD = 1.55;
 const PALM_BLOOM_COOLDOWN_MS = 800;
-
-const ROTATION_ACTIVE_SUPPRESS_BLOOM = true;
+const POST_ROTATION_BLOOM_BLOCK_MS = 600;
 
 const PINCH_DISTANCE_THRESHOLD = 0.05;
 const PINCH_EMIT_INTERVAL_MS = 1000;
@@ -64,6 +62,7 @@ interface HandHistory {
   rotationAngle: number;
   lastRotationEmit: number;
   rotationActive: boolean;
+  lastRotationEndTime: number;
 
   wristRollAngles: { angle: number; time: number }[];
 
@@ -79,6 +78,7 @@ export class GestureDetector {
   private handHistories: Map<number, HandHistory> = new Map();
   private listeners: ((event: GestureEvent) => void)[] = [];
   private currentHandCount: number = 1;
+  private lastMapping: Map<number, number> = new Map();
 
   onGesture(callback: (event: GestureEvent) => void) {
     this.listeners.push(callback);
@@ -98,6 +98,7 @@ export class GestureDetector {
         rotationAngle: 0,
         lastRotationEmit: 0,
         rotationActive: false,
+        lastRotationEndTime: 0,
         wristRollAngles: [],
         palmWasClosed: false,
         lastBloomEmit: 0,
@@ -115,28 +116,49 @@ export class GestureDetector {
     const mapping = new Map<number, number>();
     const count = handCount || 0;
 
-    if (!handedness || handedness.length === 0 || count === 0) {
-      for (let i = 0; i < count; i++) mapping.set(i, i);
+    if (count === 0) return mapping;
+
+    if (count === 1) {
+      const prevValues = [...this.lastMapping.values()];
+      if (prevValues.length === 1) {
+        mapping.set(0, prevValues[0]);
+      } else if (handedness && handedness.length > 0) {
+        const label = handedness[0].label.toLowerCase();
+        const stableIdx = label === 'left' ? 0 : 1;
+        mapping.set(0, stableIdx);
+      } else {
+        mapping.set(0, 0);
+      }
+      this.lastMapping = mapping;
       return mapping;
     }
 
-    const assignments: { rawIndex: number; label: string; score: number; sourceIndex?: number }[] = [];
+    if (!handedness || handedness.length < count) {
+      for (let i = 0; i < count; i++) mapping.set(i, i);
+      this.lastMapping = mapping;
+      return mapping;
+    }
+
+    const newMapping = new Map<number, number>();
+    const usedStable = new Set<number>();
+
+    const assignments: { rawIndex: number; label: string; score: number }[] = [];
     for (let i = 0; i < count; i++) {
       const entry = handedness[i];
       if (entry) {
-        assignments.push({ rawIndex: i, label: entry.label.toLowerCase(), score: entry.score, sourceIndex: entry.index });
+        assignments.push({ rawIndex: i, label: entry.label.toLowerCase(), score: entry.score });
       } else {
         assignments.push({ rawIndex: i, label: '', score: 0 });
       }
     }
 
-    const usedStable = new Set<number>();
-
     const sorted = [...assignments].sort((a, b) => b.score - a.score);
     for (const a of sorted) {
       let stableIdx: number;
-      if (a.sourceIndex !== undefined && a.sourceIndex >= 0 && a.sourceIndex <= 1) {
-        stableIdx = a.label === 'left' ? 0 : a.label === 'right' ? 1 : a.sourceIndex;
+
+      const prevStable = this.lastMapping.get(a.rawIndex);
+      if (prevStable !== undefined && !usedStable.has(prevStable)) {
+        stableIdx = prevStable;
       } else if (a.label === 'left') {
         stableIdx = 0;
       } else if (a.label === 'right') {
@@ -150,10 +172,11 @@ export class GestureDetector {
       }
 
       usedStable.add(stableIdx);
-      mapping.set(a.rawIndex, stableIdx);
+      newMapping.set(a.rawIndex, stableIdx);
     }
 
-    return mapping;
+    this.lastMapping = newMapping;
+    return newMapping;
   }
 
   processHands(
@@ -241,6 +264,12 @@ export class GestureDetector {
   ) {
     const openness = this.computeOpenness(landmarks);
     if (openness > FIST_OPENNESS_THRESHOLD) {
+      if (history.rotationActive) {
+        if (history.lastRotationEmit > 0 && now - history.lastRotationEmit < ROTATION_WINDOW_MS) {
+          history.lastRotationEndTime = now;
+        }
+        history.palmWasClosed = false;
+      }
       history.wristPositions = [];
       history.wristRollAngles = [];
       history.rotationActive = false;
@@ -330,11 +359,18 @@ export class GestureDetector {
     const openness = this.computeOpenness(landmarks);
 
     if (openness < PALM_CLOSE_THRESHOLD) {
-      history.palmWasClosed = true;
+      if (!history.rotationActive) {
+        history.palmWasClosed = true;
+      }
       return;
     }
 
-    if (ROTATION_ACTIVE_SUPPRESS_BLOOM && history.rotationActive) {
+    if (history.rotationActive) {
+      return;
+    }
+
+    if (now - history.lastRotationEndTime < POST_ROTATION_BLOOM_BLOCK_MS) {
+      history.palmWasClosed = false;
       return;
     }
 
@@ -400,5 +436,6 @@ export class GestureDetector {
 
   reset() {
     this.handHistories.clear();
+    this.lastMapping.clear();
   }
 }
