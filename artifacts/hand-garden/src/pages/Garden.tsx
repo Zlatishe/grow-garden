@@ -44,6 +44,7 @@ export default function Garden() {
   const [gestureToast, setGestureToast] = useState<GestureToast | null>(null);
   const toastKeyRef = useRef(0);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toastFadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const windowWidth = useWindowWidth();
 
   const isDesktop = windowWidth > 1024;
@@ -73,12 +74,13 @@ export default function Garden() {
     setGestureToast({ type: event.type, key, fading: false });
 
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    if (toastFadeTimerRef.current) clearTimeout(toastFadeTimerRef.current);
     toastTimerRef.current = setTimeout(() => {
       setGestureToast(prev => {
         if (prev && prev.key === key) return { ...prev, fading: true };
         return prev;
       });
-      setTimeout(() => {
+      toastFadeTimerRef.current = setTimeout(() => {
         setGestureToast(prev => (prev && prev.key === key ? null : prev));
       }, 400);
     }, 1100);
@@ -98,6 +100,7 @@ export default function Garden() {
   useEffect(() => {
     return () => {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      if (toastFadeTimerRef.current) clearTimeout(toastFadeTimerRef.current);
     };
   }, []);
 
