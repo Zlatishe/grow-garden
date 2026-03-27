@@ -121,7 +121,8 @@ export class GestureDetector {
     if (count === 1) {
       if (handedness && handedness.length > 0) {
         const label = handedness[0].label.toLowerCase();
-        const stableIdx = label === 'left' ? 0 : 1;
+        const prevValues = [...this.lastMapping.values()];
+        const stableIdx = label === 'left' ? 0 : label === 'right' ? 1 : (prevValues.length >= 1 ? prevValues[0] : 0);
         mapping.set(0, stableIdx);
       } else {
         const prevValues = [...this.lastMapping.values()];
