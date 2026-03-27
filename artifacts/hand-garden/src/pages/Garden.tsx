@@ -92,7 +92,7 @@ export default function Garden() {
   );
 
   useEffect(() => {
-    if (rendererRef.current) {
+    if (rendererRef.current && handsDetected > 0) {
       rendererRef.current.setHandCount(handsDetected);
     }
   }, [handsDetected]);

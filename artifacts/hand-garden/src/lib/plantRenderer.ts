@@ -71,35 +71,7 @@ export class PlantRenderer {
   }
 
   setHandCount(count: number) {
-    const newCount = Math.max(1, Math.min(2, count));
-    if (newCount !== this.handCount) {
-      this.handCount = newCount;
-      this.repositionVines();
-    }
-  }
-
-  private repositionVines() {
-    for (const [handIndex, vine] of this.vines) {
-      const newBaseX = this.getVineBaseX(handIndex);
-      const offsetX = newBaseX - vine.baseX;
-      if (Math.abs(offsetX) < 1) continue;
-
-      vine.baseX = newBaseX;
-      for (const seg of vine.segments) {
-        seg.x += offsetX;
-      }
-      for (const branch of vine.branches) {
-        for (const seg of branch.segments) {
-          seg.x += offsetX;
-        }
-      }
-      for (const flower of vine.flowers) {
-        flower.x += offsetX;
-      }
-      for (const leaf of vine.leaves) {
-        leaf.x += offsetX;
-      }
-    }
+    this.handCount = Math.max(1, Math.min(2, count));
   }
 
   private getVineBaseX(handIndex: number): number {
