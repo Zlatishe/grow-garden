@@ -54,11 +54,27 @@ export class PlantRenderer {
   private animationFrame: number = 0;
   private time: number = 0;
   private handCount: number = 1;
+  private scaleFactor: number = 1;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
     this.resize();
+  }
+
+  private updateScaleFactor() {
+    const w = window.innerWidth;
+    if (w > 1024) {
+      this.scaleFactor = 1.6 + (Math.min(w, 1920) - 1024) / (1920 - 1024) * 0.6;
+    } else if (w > 768) {
+      this.scaleFactor = 1.2 + (w - 768) / (1024 - 768) * 0.4;
+    } else {
+      this.scaleFactor = 1;
+    }
+  }
+
+  private isMobile(): boolean {
+    return window.innerWidth <= 768;
   }
 
   resize() {
@@ -68,6 +84,8 @@ export class PlantRenderer {
     this.canvas.style.width = window.innerWidth + 'px';
     this.canvas.style.height = window.innerHeight + 'px';
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.updateScaleFactor();
+    this.repositionVines();
   }
 
   setHandCount(count: number) {
@@ -77,14 +95,18 @@ export class PlantRenderer {
   private getVineBaseX(handIndex: number): number {
     const w = window.innerWidth;
     if (this.handCount <= 1) return w * 0.5;
+    if (this.isMobile()) {
+      return handIndex === 0 ? w * 0.25 : w * 0.55;
+    }
     return handIndex === 0 ? w * 0.35 : w * 0.65;
   }
 
   private ensureVine(handIndex: number): Vine {
     if (!this.vines.has(handIndex)) {
       const baseX = this.getVineBaseX(handIndex);
+      const s = this.scaleFactor;
       this.vines.set(handIndex, {
-        segments: [{ x: baseX, y: window.innerHeight - 40, angle: -Math.PI / 2, thickness: 2.8 }],
+        segments: [{ x: baseX, y: window.innerHeight - 40, angle: -Math.PI / 2, thickness: 2.8 * s }],
         branches: [],
         baseX,
         growthProgress: 0,
@@ -102,12 +124,13 @@ export class PlantRenderer {
   growStem(rotationAmount: number, handIndex: number = 0) {
     const vine = this.ensureVine(handIndex);
     const last = vine.segments[vine.segments.length - 1];
+    const s = this.scaleFactor;
 
     const clampedRotation = Math.min(rotationAmount, 0.6);
     vine.spiralAngle += clampedRotation * 0.6;
     const spiralInfluence = Math.sin(vine.spiralAngle) * 0.12;
 
-    const segmentLength = 9 + Math.random() * 5;
+    const segmentLength = (9 + Math.random() * 5) * s;
     const baseAngle = -Math.PI / 2;
     const wobble = (Math.random() - 0.5) * 0.06;
     const targetAngle = baseAngle + spiralInfluence + wobble;
@@ -121,7 +144,7 @@ export class PlantRenderer {
     const newX = last.x + Math.cos(smoothedAngle) * segmentLength;
     const newY = last.y + Math.sin(smoothedAngle) * segmentLength;
 
-    const thickness = Math.max(1.0, 2.8 - vine.segments.length * 0.012);
+    const thickness = Math.max(1.0 * s, 2.8 * s - vine.segments.length * 0.012);
 
     vine.segments.push({
       x: newX,
@@ -142,6 +165,7 @@ export class PlantRenderer {
 
   private spawnBranch(vine: Vine, segIdx: number) {
     const seg = vine.segments[segIdx];
+    const s = this.scaleFactor;
     const side = Math.random() > 0.5 ? 1 : -1;
     const branchAngle = seg.angle + side * (Math.PI / 4 + Math.random() * Math.PI / 8);
     const maxLen = 3 + Math.floor(Math.random() * 4);
@@ -156,7 +180,7 @@ export class PlantRenderer {
     let currentAngle = branchAngle;
     for (let i = 0; i < maxLen; i++) {
       const prev = branch.segments[branch.segments.length - 1];
-      const bLen = 6 + Math.random() * 4;
+      const bLen = (6 + Math.random() * 4) * s;
       const drift = (Math.random() - 0.5) * 0.08;
       currentAngle += drift;
       const gravity = 0.02;
@@ -178,6 +202,7 @@ export class PlantRenderer {
   addFlower(intensity: number, handIndex: number = 0) {
     const vine = this.vines.get(handIndex);
     if (!vine || vine.segments.length < 5) return;
+    const s = this.scaleFactor;
 
     const allAttachPoints = this.getAttachPoints(vine);
     if (allAttachPoints.length === 0) return;
@@ -186,7 +211,7 @@ export class PlantRenderer {
 
     const tooClose = vine.flowers.some(f => {
       const dist = Math.sqrt((f.x - pt.x) ** 2 + (f.y - pt.y) ** 2);
-      return dist < 40;
+      return dist < 40 * s;
     });
     if (tooClose) {
       vine.flowers.forEach(f => {
@@ -199,10 +224,10 @@ export class PlantRenderer {
 
     const petalCount = 5 + Math.floor(Math.random() * 4);
     vine.flowers.push({
-      x: pt.x + (Math.random() - 0.5) * 8,
-      y: pt.y + (Math.random() - 0.5) * 8,
+      x: pt.x + (Math.random() - 0.5) * 8 * s,
+      y: pt.y + (Math.random() - 0.5) * 8 * s,
       petalCount,
-      petalSize: 8 + Math.random() * 10,
+      petalSize: (8 + Math.random() * 10) * s,
       bloomProgress: 0,
       targetBloom: Math.min(1, 0.3 + intensity * 0.3),
       rotation: Math.random() * Math.PI * 2,
@@ -212,6 +237,7 @@ export class PlantRenderer {
   addLeaf(handIndex: number = 0) {
     const vine = this.vines.get(handIndex);
     if (!vine || vine.segments.length < 4) return;
+    const s = this.scaleFactor;
 
     const allAttachPoints = this.getAttachPoints(vine);
     if (allAttachPoints.length === 0) return;
@@ -228,7 +254,7 @@ export class PlantRenderer {
     vine.leaves.push({
       x: pt.x,
       y: pt.y,
-      size: 15 + Math.random() * 20,
+      size: (15 + Math.random() * 20) * s,
       angle: baseAngle,
       side,
       growProgress: 0,
@@ -321,13 +347,14 @@ export class PlantRenderer {
     const ctx = this.ctx;
     const progress = flower.bloomProgress;
     if (progress <= 0) return;
+    const s = this.scaleFactor;
 
     ctx.save();
     ctx.translate(flower.x, flower.y);
     ctx.rotate(flower.rotation);
 
     ctx.strokeStyle = CREAM;
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1 * s;
     ctx.globalAlpha = 0.8 + progress * 0.2;
 
     const size = flower.petalSize * progress;
@@ -363,7 +390,7 @@ export class PlantRenderer {
 
     ctx.globalAlpha = progress;
     ctx.beginPath();
-    ctx.arc(0, 0, 2 + progress * 2, 0, Math.PI * 2);
+    ctx.arc(0, 0, (2 + progress * 2) * s, 0, Math.PI * 2);
     ctx.stroke();
 
     if (progress > 0.3) {
@@ -371,9 +398,9 @@ export class PlantRenderer {
       const dotCount = 3 + Math.floor(progress * 4);
       for (let i = 0; i < dotCount; i++) {
         const a = (i / dotCount) * Math.PI * 2;
-        const r = 1.5 + progress;
-        ctx.moveTo(Math.cos(a) * r + 0.5, Math.sin(a) * r);
-        ctx.arc(Math.cos(a) * r, Math.sin(a) * r, 0.5, 0, Math.PI * 2);
+        const r = (1.5 + progress) * s;
+        ctx.moveTo(Math.cos(a) * r + 0.5 * s, Math.sin(a) * r);
+        ctx.arc(Math.cos(a) * r, Math.sin(a) * r, 0.5 * s, 0, Math.PI * 2);
       }
       ctx.stroke();
     }
@@ -386,6 +413,7 @@ export class PlantRenderer {
     const ctx = this.ctx;
     const progress = leaf.growProgress;
     if (progress <= 0) return;
+    const s = this.scaleFactor;
 
     ctx.save();
     ctx.translate(leaf.x, leaf.y);
@@ -394,7 +422,7 @@ export class PlantRenderer {
     const size = leaf.size * progress;
 
     ctx.strokeStyle = CREAM;
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1 * s;
     ctx.globalAlpha = 0.7 + progress * 0.3;
 
     ctx.beginPath();
@@ -441,10 +469,11 @@ export class PlantRenderer {
 
   private drawSmallBud(x: number, y: number, size: number) {
     const ctx = this.ctx;
+    const s = this.scaleFactor;
     ctx.save();
     ctx.translate(x, y);
     ctx.strokeStyle = CREAM;
-    ctx.lineWidth = 0.8;
+    ctx.lineWidth = 0.8 * s;
     ctx.globalAlpha = 0.4;
 
     ctx.beginPath();
@@ -504,7 +533,7 @@ export class PlantRenderer {
       if (vine.segments.length > 3) {
         const tipSeg = vine.segments[vine.segments.length - 1];
         if (vine.flowers.length === 0 && vine.leaves.length === 0) {
-          this.drawSmallBud(tipSeg.x, tipSeg.y - 3, 4);
+          this.drawSmallBud(tipSeg.x, tipSeg.y - 3 * this.scaleFactor, 4 * this.scaleFactor);
         }
       }
     }
