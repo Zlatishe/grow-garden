@@ -1,16 +1,53 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { PlantRenderer } from '../lib/plantRenderer';
 import { useHandTracking } from '../hooks/useHandTracking';
-import type { GestureEvent } from '../lib/gestureDetector';
-import { FistRotateIcon, OpenPalmIcon, PinchIcon } from '../components/GestureIcons';
+import type { GestureEvent, GestureType } from '../lib/gestureDetector';
+import { VineGrowIcon, FlowerBloomIcon, LeafSproutIcon } from '../components/GestureIcons';
 
 const FONT = "'Josefin Sans', sans-serif";
+
+interface GestureToast {
+  type: GestureType;
+  key: number;
+  fading: boolean;
+}
+
+const TOAST_LABELS: Record<GestureType, string> = {
+  wristRotation: 'Growing...',
+  openPalm: 'Blooming...',
+  pinch: 'Leafing...',
+};
+
+function GestureToastIcon({ type, size = 20 }: { type: GestureType; size?: number }) {
+  switch (type) {
+    case 'wristRotation': return <VineGrowIcon size={size} opacity={0.9} />;
+    case 'openPalm': return <FlowerBloomIcon size={size} opacity={0.9} />;
+    case 'pinch': return <LeafSproutIcon size={size} opacity={0.9} />;
+  }
+}
+
+function useWindowWidth() {
+  const [width, setWidth] = useState(window.innerWidth);
+  useEffect(() => {
+    const onResize = () => setWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  return width;
+}
 
 export default function Garden() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<PlantRenderer | null>(null);
   const [started, setStarted] = useState(false);
   const [panelExpanded, setPanelExpanded] = useState(false);
+  const [gestureToast, setGestureToast] = useState<GestureToast | null>(null);
+  const toastKeyRef = useRef(0);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const windowWidth = useWindowWidth();
+
+  const isDesktop = windowWidth > 1024;
+  const isTablet = windowWidth >= 480 && windowWidth <= 1024;
 
   const handleGesture = useCallback((event: GestureEvent) => {
     const renderer = rendererRef.current;
@@ -30,6 +67,21 @@ export default function Garden() {
         renderer.addLeaf(event.handIndex);
         break;
     }
+
+    toastKeyRef.current += 1;
+    const key = toastKeyRef.current;
+    setGestureToast({ type: event.type, key, fading: false });
+
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => {
+      setGestureToast(prev => {
+        if (prev && prev.key === key) return { ...prev, fading: true };
+        return prev;
+      });
+      setTimeout(() => {
+        setGestureToast(prev => (prev && prev.key === key ? null : prev));
+      }, 400);
+    }, 1100);
   }, [started]);
 
   const { videoRef, cameraState, handsDetected } = useHandTracking(
@@ -42,6 +94,12 @@ export default function Garden() {
       rendererRef.current.setHandCount(handsDetected);
     }
   }, [handsDetected]);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -64,10 +122,25 @@ export default function Garden() {
   };
 
   const gestureItems = [
-    { icon: <FistRotateIcon size={34} opacity={0.8} />, gesture: 'Rotate fist', effect: 'Grow vines & branches' },
-    { icon: <OpenPalmIcon size={34} opacity={0.8} />, gesture: 'Open palm', effect: 'Bloom flowers' },
-    { icon: <PinchIcon size={34} opacity={0.8} />, gesture: 'Pinch fingers', effect: 'Sprout leaves' },
+    {
+      icon: <VineGrowIcon size={isDesktop ? 38 : 34} opacity={0.8} />,
+      label: 'Grow',
+      description: 'Rotate your fist to grow vines',
+    },
+    {
+      icon: <FlowerBloomIcon size={isDesktop ? 38 : 34} opacity={0.8} />,
+      label: 'Bloom',
+      description: 'Open your palm to bloom flowers',
+    },
+    {
+      icon: <LeafSproutIcon size={isDesktop ? 38 : 34} opacity={0.8} />,
+      label: 'Leaf',
+      description: 'Pinch to sprout leaves',
+    },
   ];
+
+  const cameraWidth = isDesktop ? 180 : isTablet ? 170 : 'min(160px, 30vw)';
+  const cameraHeight = isDesktop ? 135 : isTablet ? 128 : 'min(120px, 22vw)';
 
   return (
     <div style={{
@@ -93,8 +166,8 @@ export default function Garden() {
           position: 'fixed',
           bottom: 'max(80px, calc(20px + env(safe-area-inset-bottom, 60px)))',
           right: 'max(16px, env(safe-area-inset-right, 0px))',
-          width: 'min(160px, 30vw)',
-          height: 'min(120px, 22vw)',
+          width: cameraWidth,
+          height: cameraHeight,
           borderRadius: 8,
           border: '1px solid rgba(233, 232, 213, 0.3)',
           opacity: cameraState === 'active' ? 0.8 : 0,
@@ -112,19 +185,48 @@ export default function Garden() {
         <div
           style={{
             position: 'fixed',
-            bottom: 'calc(max(80px, calc(20px + env(safe-area-inset-bottom, 60px))) + min(120px, 22vw) + 8px)',
+            bottom: `calc(max(80px, calc(20px + env(safe-area-inset-bottom, 60px))) + ${typeof cameraHeight === 'number' ? cameraHeight + 'px' : cameraHeight} + 8px)`,
             right: 'max(16px, env(safe-area-inset-right, 0px))',
             color: '#E9E8D5',
-            fontSize: 20,
+            fontSize: isDesktop ? 18 : 20,
             fontFamily: FONT,
             opacity: 0.6,
             zIndex: 10,
             textAlign: 'right',
-            width: 'min(160px, 30vw)',
+            width: typeof cameraWidth === 'number' ? cameraWidth : cameraWidth,
           }}>
           {handsDetected > 0
             ? `${handsDetected} hand${handsDetected > 1 ? 's' : ''}`
             : 'Show your hands'}
+        </div>
+      )}
+
+      {cameraState === 'active' && gestureToast && (
+        <div
+          key={gestureToast.key}
+          style={{
+            position: 'fixed',
+            bottom: `calc(max(80px, calc(20px + env(safe-area-inset-bottom, 60px))) + ${typeof cameraHeight === 'number' ? cameraHeight + 'px' : cameraHeight} + 32px)`,
+            right: 'max(16px, env(safe-area-inset-right, 0px))',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            color: '#E9E8D5',
+            fontFamily: FONT,
+            fontSize: 15,
+            background: 'rgba(51, 68, 42, 0.85)',
+            border: '1px solid rgba(233, 232, 213, 0.15)',
+            borderRadius: 8,
+            padding: '8px 14px',
+            zIndex: 15,
+            opacity: gestureToast.fading ? 0 : 1,
+            transition: 'opacity 0.4s ease-out',
+            animation: gestureToast.fading ? 'none' : 'gestureToastIn 0.3s ease-out',
+            backdropFilter: 'blur(6px)',
+          }}
+        >
+          <GestureToastIcon type={gestureToast.type} size={18} />
+          <span style={{ opacity: 0.85, letterSpacing: 1 }}>{TOAST_LABELS[gestureToast.type]}</span>
         </div>
       )}
 
@@ -137,64 +239,97 @@ export default function Garden() {
             zIndex: 20,
           }}
         >
-          <button
-            onClick={() => setPanelExpanded(!panelExpanded)}
-            style={{
-              background: 'rgba(233, 232, 213, 0.08)',
-              border: '1px solid rgba(233, 232, 213, 0.15)',
-              color: '#E9E8D5',
-              borderRadius: 8,
-              padding: '10px 16px',
-              cursor: 'pointer',
-              fontFamily: FONT,
-              fontSize: 16,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              transition: 'background 0.2s ease',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(233, 232, 213, 0.15)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(233, 232, 213, 0.08)')}
-          >
-            <FistRotateIcon size={32} opacity={0.6} />
-            <OpenPalmIcon size={32} opacity={0.6} />
-            <PinchIcon size={32} opacity={0.6} />
-          </button>
-
-          {panelExpanded && (
+          {isDesktop ? (
             <div style={{
-              position: 'absolute',
-              top: '100%',
-              right: 0,
-              marginTop: 6,
-              background: 'rgba(51, 68, 42, 0.95)',
-              border: '1px solid rgba(233, 232, 213, 0.15)',
-              borderRadius: 8,
-              padding: '18px 20px',
+              background: 'rgba(233, 232, 213, 0.06)',
+              border: '1px solid rgba(233, 232, 213, 0.12)',
+              borderRadius: 10,
+              padding: '14px 18px',
               display: 'flex',
               flexDirection: 'column',
-              gap: 16,
-              minWidth: 260,
-              backdropFilter: 'blur(8px)',
+              gap: 12,
+              minWidth: 200,
             }}>
               {gestureItems.map((item, i) => (
                 <div key={i} style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 14,
+                  gap: 12,
                   color: '#E9E8D5',
                   fontFamily: FONT,
                 }}>
-                  <div style={{ width: 40, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+                  <div style={{ width: 34, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
                     {item.icon}
                   </div>
                   <div>
-                    <div style={{ fontSize: 18, opacity: 0.9 }}>{item.gesture}</div>
-                    <div style={{ fontSize: 16, opacity: 0.5, marginTop: 2 }}>{item.effect}</div>
+                    <div style={{ fontSize: 16, opacity: 0.85 }}>{item.label}</div>
+                    <div style={{ fontSize: 13, opacity: 0.4, marginTop: 1 }}>{item.description}</div>
                   </div>
                 </div>
               ))}
             </div>
+          ) : (
+            <>
+              <button
+                onClick={() => setPanelExpanded(!panelExpanded)}
+                style={{
+                  background: 'rgba(233, 232, 213, 0.08)',
+                  border: '1px solid rgba(233, 232, 213, 0.15)',
+                  color: '#E9E8D5',
+                  borderRadius: 8,
+                  padding: '10px 16px',
+                  cursor: 'pointer',
+                  fontFamily: FONT,
+                  fontSize: 16,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  transition: 'background 0.2s ease',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(233, 232, 213, 0.15)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(233, 232, 213, 0.08)')}
+              >
+                <VineGrowIcon size={isTablet ? 30 : 28} opacity={0.6} />
+                <FlowerBloomIcon size={isTablet ? 30 : 28} opacity={0.6} />
+                <LeafSproutIcon size={isTablet ? 30 : 28} opacity={0.6} />
+              </button>
+
+              {panelExpanded && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: 6,
+                  background: 'rgba(51, 68, 42, 0.95)',
+                  border: '1px solid rgba(233, 232, 213, 0.15)',
+                  borderRadius: 8,
+                  padding: '18px 20px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 16,
+                  minWidth: isTablet ? 280 : 240,
+                  backdropFilter: 'blur(8px)',
+                }}>
+                  {gestureItems.map((item, i) => (
+                    <div key={i} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 14,
+                      color: '#E9E8D5',
+                      fontFamily: FONT,
+                    }}>
+                      <div style={{ width: 40, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+                        {item.icon}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: isTablet ? 18 : 17, opacity: 0.9 }}>{item.label}</div>
+                        <div style={{ fontSize: isTablet ? 15 : 14, opacity: 0.5, marginTop: 2 }}>{item.description}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
@@ -315,7 +450,7 @@ export default function Garden() {
           <h1 style={{
             color: '#E9E8D5',
             fontFamily: FONT,
-            fontSize: 'min(42px, 9vw)',
+            fontSize: isDesktop ? 52 : 'min(42px, 9vw)',
             fontWeight: 200,
             letterSpacing: 8,
             marginBottom: 8,
@@ -327,11 +462,11 @@ export default function Garden() {
           <p style={{
             color: '#E9E8D5',
             fontFamily: FONT,
-            fontSize: 'min(18px, 4vw)',
+            fontSize: isDesktop ? 20 : 'min(18px, 4vw)',
             fontWeight: 300,
             fontStyle: 'italic',
             opacity: 0.5,
-            marginBottom: 50,
+            marginBottom: isDesktop ? 60 : 50,
             letterSpacing: 2,
           }}>
             Grow plants with your hands
@@ -339,25 +474,44 @@ export default function Garden() {
 
           <div style={{
             display: 'flex',
-            flexDirection: 'column',
-            gap: 28,
-            maxWidth: 380,
+            flexDirection: isDesktop ? 'row' : 'column',
+            gap: isDesktop ? 50 : 28,
+            maxWidth: isDesktop ? 720 : 380,
             width: '100%',
+            justifyContent: 'center',
           }}>
             {gestureItems.map((item, i) => (
               <div key={i} style={{
                 display: 'flex',
+                flexDirection: isDesktop ? 'column' : 'row',
                 alignItems: 'center',
-                gap: 18,
+                gap: isDesktop ? 12 : 18,
                 color: '#E9E8D5',
                 fontFamily: FONT,
+                textAlign: isDesktop ? 'center' : 'left',
               }}>
-                <div style={{ width: 48, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+                <div style={{
+                  width: isDesktop ? 56 : 48,
+                  height: isDesktop ? 56 : undefined,
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  flexShrink: 0,
+                }}>
                   {item.icon}
                 </div>
                 <div>
-                  <div style={{ fontSize: 'min(20px, 4.5vw)', opacity: 0.9 }}>{item.gesture}</div>
-                  <div style={{ fontSize: 'min(16px, 3.5vw)', opacity: 0.5, marginTop: 2 }}>{item.effect}</div>
+                  <div style={{
+                    fontSize: isDesktop ? 22 : isTablet ? 20 : 'min(20px, 4.5vw)',
+                    opacity: 0.9,
+                    fontWeight: 300,
+                    letterSpacing: 2,
+                  }}>{item.label}</div>
+                  <div style={{
+                    fontSize: isDesktop ? 14 : isTablet ? 15 : 'min(14px, 3.2vw)',
+                    opacity: 0.45,
+                    marginTop: 3,
+                  }}>{item.description}</div>
                 </div>
               </div>
             ))}
@@ -368,12 +522,25 @@ export default function Garden() {
             fontFamily: FONT,
             fontSize: 16,
             opacity: 0.4,
-            marginTop: 50,
+            marginTop: isDesktop ? 60 : 50,
           }}>
             Tap anywhere to begin
           </p>
         </div>
       )}
+
+      <style>{`
+        @keyframes gestureToastIn {
+          from {
+            opacity: 0;
+            transform: translateY(8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
     </div>
   );
 }
