@@ -156,15 +156,13 @@ export class GestureDetector {
     for (const a of sorted) {
       let stableIdx: number;
 
-      const prevStable = this.lastMapping.get(a.rawIndex);
-      if (prevStable !== undefined && !usedStable.has(prevStable)) {
-        stableIdx = prevStable;
-      } else if (a.label === 'left') {
+      if (a.label === 'left') {
         stableIdx = 0;
       } else if (a.label === 'right') {
         stableIdx = 1;
       } else {
-        stableIdx = a.rawIndex;
+        const prevStable = this.lastMapping.get(a.rawIndex);
+        stableIdx = prevStable !== undefined ? prevStable : a.rawIndex;
       }
 
       if (usedStable.has(stableIdx)) {

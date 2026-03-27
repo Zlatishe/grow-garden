@@ -212,9 +212,7 @@ export class PlantRenderer {
       const currentLen = branch.segments.length - 1;
       if (currentLen >= branch.maxLength) continue;
 
-      const segsToAdd = Math.min(2, branch.maxLength - currentLen);
-
-      for (let j = 0; j < segsToAdd; j++) {
+      {
         const i = branch.segments.length - 1;
         const prev = branch.segments[branch.segments.length - 1];
         const progress = i / branch.maxLength;
