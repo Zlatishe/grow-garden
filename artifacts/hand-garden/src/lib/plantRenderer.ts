@@ -85,7 +85,6 @@ export class PlantRenderer {
     this.canvas.style.height = window.innerHeight + 'px';
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.updateScaleFactor();
-    this.repositionVines();
   }
 
   setHandCount(count: number) {
