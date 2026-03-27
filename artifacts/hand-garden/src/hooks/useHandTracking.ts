@@ -50,11 +50,13 @@ export function useHandTracking(
         if (destroyedRef.current) return;
         if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
           setHandsDetected(results.multiHandLandmarks.length);
-          const handedness = results.multiHandedness?.map((h: any) => ({
-            label: h.label as string,
-            score: h.score as number,
-            index: h.index as number | undefined,
-          }));
+          const handedness = results.multiHandedness?.map(
+            (h: { label: string; score: number; index?: number }) => ({
+              label: h.label,
+              score: h.score,
+              index: h.index,
+            })
+          );
           gestureDetector.current.processHands(
             results.multiHandLandmarks,
             handedness
