@@ -212,44 +212,37 @@ export default function Garden() {
         <div
           style={{
             position: 'fixed',
-            bottom: `calc(max(80px, calc(20px + env(safe-area-inset-bottom, 60px))) - 4px)`,
-            right: 'max(16px, env(safe-area-inset-right, 0px))',
-            width: typeof cameraWidth === 'number' ? cameraWidth : cameraWidth,
-            textAlign: 'center',
-            color: '#E9E8D5',
-            fontFamily: FONT,
-            fontSize: ts(tier, 'sm'),
-            opacity: 0.6,
-            zIndex: 15,
-            letterSpacing: 0.5,
-          }}>
-          {handsDetected > 0
-            ? `${handsDetected} hand${handsDetected > 1 ? 's' : ''}`
-            : 'Show your hands'}
-        </div>
-      )}
-
-      {cameraState === 'active' && gestureToast && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: `calc(max(80px, calc(20px + env(safe-area-inset-bottom, 60px))) + ${typeof cameraHeight === 'number' ? cameraHeight + 'px' : cameraHeight} + 8px)`,
+            bottom: `calc(max(80px, calc(20px + env(safe-area-inset-bottom, 60px))) + ${typeof cameraHeight === 'number' ? cameraHeight + 'px' : cameraHeight} + 6px)`,
             right: 'max(16px, env(safe-area-inset-right, 0px))',
             width: typeof cameraWidth === 'number' ? cameraWidth : cameraWidth,
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'center',
-            gap: 6,
+            gap: 2,
             color: '#E9E8D5',
             fontFamily: FONT,
             fontSize: ts(tier, 'sm'),
-            opacity: gestureToast.fading ? 0 : 0.7,
-            transition: 'opacity 0.3s ease-out',
             zIndex: 15,
             letterSpacing: 0.5,
           }}>
-          <GestureToastIcon type={gestureToast.type} size={14} />
-          {TOAST_LABELS[gestureToast.type]}
+          <span
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              opacity: gestureToast && !gestureToast.fading ? 0.7 : 0,
+              transition: 'opacity 0.3s ease-out',
+              height: 18,
+            }}
+          >
+            {gestureToast && <GestureToastIcon type={gestureToast.type} size={14} />}
+            {gestureToast && TOAST_LABELS[gestureToast.type]}
+          </span>
+          <span style={{ opacity: 0.5 }}>
+            {handsDetected > 0
+              ? `${handsDetected} hand${handsDetected > 1 ? 's' : ''}`
+              : 'Show your hands'}
+          </span>
         </div>
       )}
 
