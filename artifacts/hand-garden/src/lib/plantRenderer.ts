@@ -127,45 +127,50 @@ export class PlantRenderer {
 
   growStem(rotationAmount: number, handIndex: number = 0) {
     const vine = this.ensureVine(handIndex);
-    const last = vine.segments[vine.segments.length - 1];
     const s = this.scaleFactor;
 
     this.growPendingBranches(vine);
 
-    const clampedRotation = Math.min(rotationAmount, 0.6);
-    vine.spiralAngle += clampedRotation * 0.5;
-    const spiralInfluence = Math.sin(vine.spiralAngle) * 0.08;
+    const segmentsPerTick = 2 + Math.floor(Math.random() * 2);
 
-    const segmentLength = (9 + Math.random() * 5) * s;
-    const baseAngle = -Math.PI / 2;
-    const wobble = (Math.random() - 0.5) * 0.03;
-    const targetAngle = baseAngle + spiralInfluence + wobble;
+    for (let t = 0; t < segmentsPerTick; t++) {
+      const last = vine.segments[vine.segments.length - 1];
 
-    const smoothedAngle = vine.lastAngle + (targetAngle - vine.lastAngle) * 0.25;
-    vine.lastAngle = smoothedAngle;
+      const clampedRotation = Math.min(rotationAmount, 0.6);
+      vine.spiralAngle += clampedRotation * 0.3;
+      const spiralInfluence = Math.sin(vine.spiralAngle) * 0.08;
 
-    const maxHeight = 80;
-    if (last.y < maxHeight) return;
+      const segmentLength = (14 + Math.random() * 6) * s;
+      const baseAngle = -Math.PI / 2;
+      const wobble = (Math.random() - 0.5) * 0.03;
+      const targetAngle = baseAngle + spiralInfluence + wobble;
 
-    const newX = last.x + Math.cos(smoothedAngle) * segmentLength;
-    const newY = last.y + Math.sin(smoothedAngle) * segmentLength;
+      const smoothedAngle = vine.lastAngle + (targetAngle - vine.lastAngle) * 0.25;
+      vine.lastAngle = smoothedAngle;
 
-    const thickness = Math.max(1.2 * s, 4.5 * s - vine.segments.length * 0.02);
+      const maxHeight = 60;
+      if (last.y < maxHeight) return;
 
-    vine.segments.push({
-      x: newX,
-      y: newY,
-      angle: smoothedAngle,
-      thickness,
-    });
+      const newX = last.x + Math.cos(smoothedAngle) * segmentLength;
+      const newY = last.y + Math.sin(smoothedAngle) * segmentLength;
 
-    vine.growthProgress += segmentLength;
-    vine.segmentsSinceLastBranch++;
+      const thickness = Math.max(1.5 * s, 5 * s - vine.segments.length * 0.015);
 
-    const branchInterval = 5 + Math.floor(Math.random() * 4);
-    if (vine.segmentsSinceLastBranch >= branchInterval && vine.segments.length > 3) {
-      this.spawnBranch(vine, vine.segments.length - 1, 0);
-      vine.segmentsSinceLastBranch = 0;
+      vine.segments.push({
+        x: newX,
+        y: newY,
+        angle: smoothedAngle,
+        thickness,
+      });
+
+      vine.growthProgress += segmentLength;
+      vine.segmentsSinceLastBranch++;
+
+      const branchInterval = 3 + Math.floor(Math.random() * 3);
+      if (vine.segmentsSinceLastBranch >= branchInterval && vine.segments.length > 3) {
+        this.spawnBranch(vine, vine.segments.length - 1, 0);
+        vine.segmentsSinceLastBranch = 0;
+      }
     }
   }
 
@@ -173,18 +178,18 @@ export class PlantRenderer {
     const seg = sourceSeg || vine.segments[segIdx];
     const side = Math.random() > 0.5 ? 1 : -1;
 
-    const startAngle = seg.angle + side * (0.15 + Math.random() * 0.1);
+    const startAngle = seg.angle + side * (0.2 + Math.random() * 0.15);
 
     const finalSpread = depth === 0
-      ? Math.PI / 4 + Math.random() * Math.PI / 6
-      : Math.PI / 5 + Math.random() * Math.PI / 8;
+      ? Math.PI / 3 + Math.random() * Math.PI / 4
+      : Math.PI / 4 + Math.random() * Math.PI / 6;
     const targetAngle = seg.angle + side * finalSpread;
 
     const maxLen = depth === 0
-      ? 12 + Math.floor(Math.random() * 9)
-      : 5 + Math.floor(Math.random() * 6);
+      ? 16 + Math.floor(Math.random() * 12)
+      : 8 + Math.floor(Math.random() * 8);
 
-    const thicknessRatio = depth === 0 ? 0.65 : 0.55;
+    const thicknessRatio = depth === 0 ? 0.75 : 0.65;
 
     const branch: Branch = {
       segments: [{ x: seg.x, y: seg.y, angle: startAngle, thickness: seg.thickness * thicknessRatio }],
@@ -214,8 +219,8 @@ export class PlantRenderer {
         const progress = i / branch.maxLength;
 
         const bLen = (branch.depth === 0
-          ? 8 + Math.random() * 4
-          : 5 + Math.random() * 3) * s;
+          ? 12 + Math.random() * 6
+          : 8 + Math.random() * 4) * s;
 
         const curveToTarget = (branch.targetAngle - branch.currentAngle) * 0.15;
         const organicWave = Math.sin(branch.curveSeed + progress * Math.PI * 2.5) * 0.04;
@@ -269,12 +274,12 @@ export class PlantRenderer {
       }
     }
 
-    const petalCount = 5 + Math.floor(Math.random() * 4);
+    const petalCount = 3 + Math.floor(Math.random() * 3);
     vine.flowers.push({
       x: chosenPt.x + (Math.random() - 0.5) * 8 * s,
       y: chosenPt.y + (Math.random() - 0.5) * 8 * s,
       petalCount,
-      petalSize: (8 + Math.random() * 10) * s,
+      petalSize: (10 + Math.random() * 12) * s,
       bloomProgress: 0,
       targetBloom: 1.0,
       rotation: Math.random() * Math.PI * 2,
@@ -404,7 +409,7 @@ export class PlantRenderer {
     ctx.lineWidth = 1 * s;
     ctx.globalAlpha = 0.8 + progress * 0.2;
 
-    const size = flower.petalSize * progress;
+    const size = Math.max(flower.petalSize * progress, 4 * s);
 
     for (let i = 0; i < flower.petalCount; i++) {
       const angle = (i / flower.petalCount) * Math.PI * 2;
@@ -413,44 +418,23 @@ export class PlantRenderer {
 
       ctx.beginPath();
       ctx.moveTo(0, 0);
-      const cp1x = size * 0.3;
-      const cp1y = -size * 0.6;
-      const cp2x = size * 0.7;
-      const cp2y = -size * 0.6;
-      const ex = size * 0.5;
+      const cp1x = size * 0.15;
+      const cp1y = -size * 0.75;
+      const cp2x = size * 0.85;
+      const cp2y = -size * 0.75;
+      const ex = size * 0.7;
       const ey = 0;
       ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, ex, ey);
-      ctx.bezierCurveTo(cp2x, -cp2y + ey * 2, cp1x, -cp1y + ey * 2, 0, 0);
+      ctx.bezierCurveTo(cp2x, cp2y * -1, cp1x, cp1y * -1, 0, 0);
       ctx.stroke();
-
-      if (progress > 0.5) {
-        ctx.globalAlpha = (progress - 0.5) * 0.3;
-        ctx.beginPath();
-        const veinLen = size * 0.4 * progress;
-        ctx.moveTo(2, 0);
-        ctx.lineTo(size * 0.3, -veinLen * 0.3);
-        ctx.stroke();
-      }
 
       ctx.restore();
     }
 
-    ctx.globalAlpha = progress;
+    ctx.globalAlpha = progress * 0.6;
     ctx.beginPath();
-    ctx.arc(0, 0, (2 + progress * 2) * s, 0, Math.PI * 2);
+    ctx.arc(0, 0, 1.5 * s, 0, Math.PI * 2);
     ctx.stroke();
-
-    if (progress > 0.3) {
-      ctx.beginPath();
-      const dotCount = 3 + Math.floor(progress * 4);
-      for (let i = 0; i < dotCount; i++) {
-        const a = (i / dotCount) * Math.PI * 2;
-        const r = (1.5 + progress) * s;
-        ctx.moveTo(Math.cos(a) * r + 0.5 * s, Math.sin(a) * r);
-        ctx.arc(Math.cos(a) * r, Math.sin(a) * r, 0.5 * s, 0, Math.PI * 2);
-      }
-      ctx.stroke();
-    }
 
     ctx.restore();
     ctx.globalAlpha = 1;
