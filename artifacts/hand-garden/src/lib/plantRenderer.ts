@@ -406,35 +406,49 @@ export class PlantRenderer {
     ctx.rotate(flower.rotation);
 
     ctx.strokeStyle = CREAM;
-    ctx.lineWidth = 1 * s;
-    ctx.globalAlpha = 0.8 + progress * 0.2;
+    ctx.lineWidth = 0.8 * s;
+    ctx.globalAlpha = 0.75 + progress * 0.25;
 
-    const size = Math.max(flower.petalSize * progress, 4 * s);
+    const size = Math.max(flower.petalSize * progress, 5 * s);
+    const n = flower.petalCount;
 
-    for (let i = 0; i < flower.petalCount; i++) {
-      const angle = (i / flower.petalCount) * Math.PI * 2;
+    for (let i = 0; i < n; i++) {
+      const angle = (i / n) * Math.PI * 2;
       ctx.save();
       ctx.rotate(angle);
 
+      const petalLen = size * (0.9 + Math.sin(flower.rotation * 3 + i) * 0.1);
+      const width = petalLen * 0.38;
+
       ctx.beginPath();
-      ctx.moveTo(0, 0);
-      const cp1x = size * 0.15;
-      const cp1y = -size * 0.75;
-      const cp2x = size * 0.85;
-      const cp2y = -size * 0.75;
-      const ex = size * 0.7;
-      const ey = 0;
-      ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, ex, ey);
-      ctx.bezierCurveTo(cp2x, cp2y * -1, cp1x, cp1y * -1, 0, 0);
+      ctx.moveTo(size * 0.12, 0);
+      ctx.bezierCurveTo(
+        width * 0.5, -width,
+        petalLen * 0.6, -width * 0.9,
+        petalLen, 0
+      );
+      ctx.bezierCurveTo(
+        petalLen * 0.6, width * 0.9,
+        width * 0.5, width,
+        size * 0.12, 0
+      );
       ctx.stroke();
 
       ctx.restore();
     }
 
-    ctx.globalAlpha = progress * 0.6;
+    ctx.globalAlpha = progress * 0.8;
     ctx.beginPath();
-    ctx.arc(0, 0, 1.5 * s, 0, Math.PI * 2);
+    ctx.arc(0, 0, size * 0.1, 0, Math.PI * 2);
     ctx.stroke();
+
+    if (progress > 0.6 && n <= 4) {
+      ctx.globalAlpha = (progress - 0.6) * 0.4;
+      ctx.beginPath();
+      ctx.arc(0, 0, size * 0.06, 0, Math.PI * 2);
+      ctx.fillStyle = CREAM;
+      ctx.fill();
+    }
 
     ctx.restore();
     ctx.globalAlpha = 1;
