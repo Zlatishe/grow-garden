@@ -49,6 +49,7 @@ interface Vine {
   flowers: Flower[];
   leaves: Leaf[];
   nextLeafSide: 'left' | 'right';
+  nextBranchSide: 1 | -1;
   lastAngle: number;
 }
 
@@ -119,6 +120,7 @@ export class PlantRenderer {
         flowers: [],
         leaves: [],
         nextLeafSide: 'left',
+        nextBranchSide: 1 as 1 | -1,
         lastAngle: -Math.PI / 2,
       });
     }
@@ -176,7 +178,10 @@ export class PlantRenderer {
 
   private spawnBranch(vine: Vine, segIdx: number, depth: number, sourceSeg?: StemSegment) {
     const seg = sourceSeg || vine.segments[segIdx];
-    const side = Math.random() > 0.5 ? 1 : -1;
+    const side = depth === 0 ? vine.nextBranchSide : (Math.random() > 0.5 ? 1 : -1);
+    if (depth === 0) {
+      vine.nextBranchSide = (vine.nextBranchSide * -1) as 1 | -1;
+    }
 
     const startAngle = seg.angle + side * (0.2 + Math.random() * 0.15);
 

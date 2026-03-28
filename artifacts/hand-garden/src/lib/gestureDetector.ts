@@ -47,8 +47,10 @@ const PALM_OPEN_THRESHOLD = 1.55;
 const PALM_BLOOM_COOLDOWN_MS = 800;
 const POST_ROTATION_BLOOM_BLOCK_MS = 600;
 
-const PINCH_DISTANCE_THRESHOLD = 0.05;
+const PINCH_DISTANCE_THRESHOLD = 0.035;
 const PINCH_EMIT_INTERVAL_MS = 1000;
+const PINCH_SUSTAIN_MS = 150;
+const BLOOM_LEAF_MUTUAL_COOLDOWN_MS = 500;
 
 const SMOOTH_FACTOR = 0.4;
 
@@ -70,6 +72,8 @@ interface HandHistory {
   lastBloomEmit: number;
 
   lastPinchEmit: number;
+  pinchStartTime: number;
+  lastLeafEmit: number;
 
   smoothedPos: SmoothedPosition | null;
 }
@@ -103,6 +107,8 @@ export class GestureDetector {
         palmWasClosed: false,
         lastBloomEmit: 0,
         lastPinchEmit: 0,
+        pinchStartTime: 0,
+        lastLeafEmit: 0,
         smoothedPos: null,
       });
     }
@@ -378,7 +384,8 @@ export class GestureDetector {
     if (history.palmWasClosed && openness > PALM_OPEN_THRESHOLD) {
       history.palmWasClosed = false;
 
-      if (now - history.lastBloomEmit > PALM_BLOOM_COOLDOWN_MS) {
+      if (now - history.lastBloomEmit > PALM_BLOOM_COOLDOWN_MS &&
+          now - history.lastLeafEmit > BLOOM_LEAF_MUTUAL_COOLDOWN_MS) {
         history.lastBloomEmit = now;
         this.emit({
           type: 'openPalm',
@@ -408,6 +415,7 @@ export class GestureDetector {
     );
 
     if (pinchDist > PINCH_DISTANCE_THRESHOLD) {
+      history.pinchStartTime = 0;
       return;
     }
 
@@ -418,11 +426,22 @@ export class GestureDetector {
     const otherFingersUp = (middleExtended ? 1 : 0) + (ringExtended ? 1 : 0) + (pinkyExtended ? 1 : 0);
 
     if (otherFingersUp < 2) {
+      history.pinchStartTime = 0;
       return;
     }
 
-    if (now - history.lastPinchEmit > PINCH_EMIT_INTERVAL_MS) {
+    if (history.pinchStartTime === 0) {
+      history.pinchStartTime = now;
+    }
+
+    if (now - history.pinchStartTime < PINCH_SUSTAIN_MS) {
+      return;
+    }
+
+    if (now - history.lastPinchEmit > PINCH_EMIT_INTERVAL_MS &&
+        now - history.lastBloomEmit > BLOOM_LEAF_MUTUAL_COOLDOWN_MS) {
       history.lastPinchEmit = now;
+      history.lastLeafEmit = now;
       this.emit({
         type: 'pinch',
         handIndex,
