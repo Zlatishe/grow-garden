@@ -43,7 +43,7 @@ const ROTATION_COOLDOWN_MS = 500;
 const FIST_OPENNESS_THRESHOLD = 1.0;
 
 const PALM_CLOSE_THRESHOLD = 1.25;
-const PALM_OPEN_THRESHOLD = 1.55;
+const PALM_OPEN_THRESHOLD = 1.7;
 const PALM_BLOOM_COOLDOWN_MS = 800;
 const POST_ROTATION_BLOOM_BLOCK_MS = 600;
 
@@ -387,6 +387,16 @@ export class GestureDetector {
     }
 
     if (history.palmWasClosed && openness > PALM_OPEN_THRESHOLD) {
+      const thumbTip = landmarks[THUMB_TIP];
+      const indexTip = landmarks[INDEX_TIP];
+      const pinchDist = Math.sqrt(
+        (thumbTip.x - indexTip.x) ** 2 +
+        (thumbTip.y - indexTip.y) ** 2
+      );
+      if (pinchDist < PINCH_DISTANCE_THRESHOLD * 1.5) {
+        return;
+      }
+
       history.palmWasClosed = false;
 
       if (now - history.lastBloomEmit > PALM_BLOOM_COOLDOWN_MS &&
