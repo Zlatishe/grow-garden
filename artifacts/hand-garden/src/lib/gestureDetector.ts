@@ -51,6 +51,7 @@ const PINCH_DISTANCE_THRESHOLD = 0.045;
 const PINCH_EMIT_INTERVAL_MS = 1000;
 const PINCH_SUSTAIN_MS = 150;
 const BLOOM_LEAF_MUTUAL_COOLDOWN_MS = 500;
+const BLOOM_PINCH_GUARD_FACTOR = 1.5;
 
 const SMOOTH_FACTOR = 0.4;
 
@@ -393,7 +394,7 @@ export class GestureDetector {
         (thumbTip.x - indexTip.x) ** 2 +
         (thumbTip.y - indexTip.y) ** 2
       );
-      if (pinchDist < PINCH_DISTANCE_THRESHOLD * 1.5) {
+      if (pinchDist < PINCH_DISTANCE_THRESHOLD * BLOOM_PINCH_GUARD_FACTOR) {
         return;
       }
 
