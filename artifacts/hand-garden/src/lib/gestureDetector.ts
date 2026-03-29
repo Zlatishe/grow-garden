@@ -37,7 +37,7 @@ const PINKY_MCP = 17;
 const ROTATION_ANGLE_THRESHOLD = Math.PI * 1.2;
 const ROTATION_RADIUS_THRESHOLD = 0.03;
 const ROTATION_MIN_POSITIONS_1H = 7;
-const ROTATION_MIN_POSITIONS_2H = 6;
+const ROTATION_MIN_POSITIONS_2H = 4;
 const ROTATION_WINDOW_MS = 1800;
 const ROTATION_COOLDOWN_MS = 500;
 const FIST_OPENNESS_THRESHOLD = 1.0;
@@ -76,6 +76,7 @@ interface HandHistory {
   lastLeafEmit: number;
 
   smoothedPos: SmoothedPosition | null;
+  lastSeenTime: number;
 }
 
 export class GestureDetector {
@@ -110,6 +111,7 @@ export class GestureDetector {
         pinchStartTime: 0,
         lastLeafEmit: 0,
         smoothedPos: null,
+        lastSeenTime: 0,
       });
     }
     return this.handHistories.get(handIndex)!;
@@ -195,19 +197,22 @@ export class GestureDetector {
 
     const indexMap = this.resolveStableIndices(multiHandedness, multiHandLandmarks.length);
 
+    const now = Date.now();
+
     multiHandLandmarks.forEach((landmarks, rawIndex) => {
       const stableIndex = indexMap.get(rawIndex) ?? rawIndex;
       activeHands.add(stableIndex);
       const history = this.getHistory(stableIndex);
-      const now = Date.now();
+      history.lastSeenTime = now;
 
       this.detectFistRotation(landmarks, stableIndex, history, now);
       this.detectPalmOpenClose(landmarks, stableIndex, history, now);
       this.detectPinch(landmarks, stableIndex, history, now);
     });
 
-    for (const [key] of this.handHistories) {
-      if (!activeHands.has(key)) {
+    const HISTORY_GRACE_MS = 500;
+    for (const [key, history] of this.handHistories) {
+      if (!activeHands.has(key) && now - history.lastSeenTime > HISTORY_GRACE_MS) {
         this.handHistories.delete(key);
       }
     }
