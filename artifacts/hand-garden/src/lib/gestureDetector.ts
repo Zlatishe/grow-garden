@@ -395,6 +395,7 @@ export class GestureDetector {
         (thumbTip.y - indexTip.y) ** 2
       );
       if (pinchDist < PINCH_DISTANCE_THRESHOLD * BLOOM_PINCH_GUARD_FACTOR) {
+        history.palmWasClosed = false;
         return;
       }
 
