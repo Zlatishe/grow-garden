@@ -30,9 +30,9 @@ function LeafSproutIcon({ size = 36, opacity = 0.7 }: { size?: number; opacity?:
       <path d="M14 26C14 24 13.8 21 14 19" stroke={CREAM} strokeWidth="1.4" strokeLinecap="round" opacity={opacity * 0.6} />
       <path d="M14 19C11.5 16.5 8 13 6 10C8 9.5 12 9 16 11.5C20 14 20 17 14 19Z" stroke={CREAM} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" opacity={opacity} />
       <path d="M6.5 10.5L14 19" stroke={CREAM} strokeWidth="0.9" strokeLinecap="round" opacity={opacity * 0.5} />
-      <path d="M9 12.5L10.5 14.5" stroke={CREAM} strokeWidth="0.7" strokeLinecap="round" opacity={opacity * 0.35} />
-      <path d="M8.5 14.5L10.5 16" stroke={CREAM} strokeWidth="0.7" strokeLinecap="round" opacity={opacity * 0.35} />
-      <path d="M11.5 13L13 15" stroke={CREAM} strokeWidth="0.7" strokeLinecap="round" opacity={opacity * 0.35} />
+      <path d="M8.75 13L10.5 11.5" stroke={CREAM} strokeWidth="0.7" strokeLinecap="round" opacity={opacity * 0.35} />
+      <path d="M10.25 14.75L8.5 15.5" stroke={CREAM} strokeWidth="0.7" strokeLinecap="round" opacity={opacity * 0.35} />
+      <path d="M11.5 16L13 14.5" stroke={CREAM} strokeWidth="0.7" strokeLinecap="round" opacity={opacity * 0.35} />
     </svg>
   );
 }
