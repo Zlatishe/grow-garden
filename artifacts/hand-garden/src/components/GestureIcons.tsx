@@ -96,14 +96,14 @@ export function LeafSproutIcon({ size = 36, opacity = 0.7 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path
-        d="M14 26C14 24 13.5 21 14 18"
+        d="M14 26C14 24 13.8 21 14 19"
         stroke={CREAM}
         strokeWidth="1.4"
         strokeLinecap="round"
         opacity={opacity * 0.6}
       />
       <path
-        d="M14 18C14 18 11 14 7 12C7 12 7.5 8 14 10C20.5 12 20 16 14 18Z"
+        d="M14 19C11.5 16.5 8 13 6 10C8 9.5 12 9 16 11.5C20 14 20 17 14 19Z"
         stroke={CREAM}
         strokeWidth="1.2"
         strokeLinecap="round"
@@ -111,28 +111,28 @@ export function LeafSproutIcon({ size = 36, opacity = 0.7 }: IconProps) {
         opacity={opacity}
       />
       <path
-        d="M7.5 11.5L14 18"
+        d="M6.5 10.5L14 19"
         stroke={CREAM}
         strokeWidth="0.9"
         strokeLinecap="round"
         opacity={opacity * 0.5}
       />
       <path
-        d="M10 11.5L12 14"
+        d="M9 12.5L10.5 14.5"
         stroke={CREAM}
         strokeWidth="0.7"
         strokeLinecap="round"
         opacity={opacity * 0.35}
       />
       <path
-        d="M9 14L12 15.5"
+        d="M8.5 14.5L10.5 16"
         stroke={CREAM}
         strokeWidth="0.7"
         strokeLinecap="round"
         opacity={opacity * 0.35}
       />
       <path
-        d="M13.5 12L15.5 14"
+        d="M11.5 13L13 15"
         stroke={CREAM}
         strokeWidth="0.7"
         strokeLinecap="round"
