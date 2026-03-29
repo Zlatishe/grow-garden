@@ -85,6 +85,7 @@ export class GestureDetector {
   private listeners: ((event: GestureEvent) => void)[] = [];
   private currentHandCount: number = 1;
   private lastMapping: Map<number, number> = new Map();
+  private lastWristPos: Map<number, { x: number; y: number }> = new Map();
 
   onGesture(callback: (event: GestureEvent) => void) {
     this.listeners.push(callback);
@@ -120,7 +121,8 @@ export class GestureDetector {
 
   private resolveStableIndices(
     handedness?: HandednessInfo[],
-    handCount?: number
+    handCount?: number,
+    multiHandLandmarks?: HandLandmark[][]
   ): Map<number, number> {
     const mapping = new Map<number, number>();
     const count = handCount || 0;
@@ -141,6 +143,32 @@ export class GestureDetector {
           mapping.set(0, 0);
         }
       }
+      this.lastMapping = mapping;
+      return mapping;
+    }
+
+    if (count === 2 && multiHandLandmarks && multiHandLandmarks.length === 2 && this.lastWristPos.size === 2) {
+      const wrists = multiHandLandmarks.map(lm => ({ x: lm[WRIST].x, y: lm[WRIST].y }));
+
+      const dist = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+        Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
+
+      const prev0 = this.lastWristPos.get(0)!;
+      const prev1 = this.lastWristPos.get(1)!;
+
+      const d00 = dist(wrists[0], prev0);
+      const d01 = dist(wrists[0], prev1);
+      const d10 = dist(wrists[1], prev0);
+      const d11 = dist(wrists[1], prev1);
+
+      if (d00 + d11 <= d01 + d10) {
+        mapping.set(0, 0);
+        mapping.set(1, 1);
+      } else {
+        mapping.set(0, 1);
+        mapping.set(1, 0);
+      }
+
       this.lastMapping = mapping;
       return mapping;
     }
@@ -196,7 +224,7 @@ export class GestureDetector {
     const activeHands = new Set<number>();
     this.currentHandCount = multiHandLandmarks.length;
 
-    const indexMap = this.resolveStableIndices(multiHandedness, multiHandLandmarks.length);
+    const indexMap = this.resolveStableIndices(multiHandedness, multiHandLandmarks.length, multiHandLandmarks);
 
     const now = Date.now();
 
@@ -205,6 +233,8 @@ export class GestureDetector {
       activeHands.add(stableIndex);
       const history = this.getHistory(stableIndex);
       history.lastSeenTime = now;
+
+      this.lastWristPos.set(stableIndex, { x: landmarks[WRIST].x, y: landmarks[WRIST].y });
 
       this.detectFistRotation(landmarks, stableIndex, history, now);
       this.detectPalmOpenClose(landmarks, stableIndex, history, now);
@@ -474,5 +504,6 @@ export class GestureDetector {
   reset() {
     this.handHistories.clear();
     this.lastMapping.clear();
+    this.lastWristPos.clear();
   }
 }
