@@ -156,7 +156,7 @@ export class PlantRenderer {
       const newX = last.x + Math.cos(smoothedAngle) * segmentLength;
       const newY = last.y + Math.sin(smoothedAngle) * segmentLength;
 
-      const thickness = Math.max(1.5 * s, 5 * s - vine.segments.length * 0.015);
+      const thickness = Math.max(2.5 * s, 5 * s - vine.segments.length * 0.012);
 
       vine.segments.push({
         x: newX,
@@ -194,7 +194,7 @@ export class PlantRenderer {
       ? 16 + Math.floor(Math.random() * 12)
       : 8 + Math.floor(Math.random() * 8);
 
-    const thicknessRatio = depth === 0 ? 0.75 : 0.65;
+    const thicknessRatio = depth === 0 ? 0.8 : 0.7;
 
     const branch: Branch = {
       segments: [{ x: seg.x, y: seg.y, angle: startAngle, thickness: seg.thickness * thicknessRatio }],
@@ -238,7 +238,7 @@ export class PlantRenderer {
           x: prev.x + Math.cos(branch.currentAngle) * bLen,
           y: prev.y + Math.sin(branch.currentAngle) * bLen,
           angle: branch.currentAngle,
-          thickness: Math.max(0.4, prev.thickness * taperRate),
+          thickness: Math.max(0.8 * s, prev.thickness * taperRate),
         });
 
         branch.segsSinceSubBranch++;

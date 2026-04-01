@@ -34,16 +34,15 @@ const MIDDLE_MCP = 9;
 const RING_MCP = 13;
 const PINKY_MCP = 17;
 
-const ROTATION_ANGLE_THRESHOLD = Math.PI * 1.2;
+const ROTATION_ANGLE_THRESHOLD = Math.PI * 0.6;
 const ROTATION_RADIUS_THRESHOLD = 0.03;
-const ROTATION_MIN_POSITIONS_1H = 7;
-const ROTATION_MIN_POSITIONS_2H = 4;
+const ROTATION_MIN_POSITIONS = 3;
 const ROTATION_WINDOW_MS = 1800;
 const ROTATION_COOLDOWN_MS = 500;
 const FIST_OPENNESS_THRESHOLD = 1.0;
 
-const PALM_CLOSE_THRESHOLD = 1.25;
-const PALM_OPEN_THRESHOLD = 1.7;
+const PALM_CLOSE_THRESHOLD = 1.1;
+const PALM_OPEN_THRESHOLD = 1.55;
 const PALM_BLOOM_COOLDOWN_MS = 800;
 const POST_ROTATION_BLOOM_BLOCK_MS = 600;
 
@@ -339,8 +338,7 @@ export class GestureDetector {
     const cutoff = now - ROTATION_WINDOW_MS;
     history.wristPositions = history.wristPositions.filter(p => p.time > cutoff);
 
-    const minPositions = this.currentHandCount >= 2 ? ROTATION_MIN_POSITIONS_2H : ROTATION_MIN_POSITIONS_1H;
-    if (history.wristPositions.length < minPositions) return;
+    if (history.wristPositions.length < ROTATION_MIN_POSITIONS) return;
 
     let totalRollAngle = 0;
     const rollAngles = history.wristRollAngles;
@@ -371,12 +369,13 @@ export class GestureDetector {
     const absRollAngle = Math.abs(totalRollAngle);
     const combinedAngle = Math.max(absCircularAngle, absRollAngle);
 
-    if (combinedAngle > ROTATION_ANGLE_THRESHOLD) {
+    const angleThreshold = ROTATION_ANGLE_THRESHOLD;
+    if (combinedAngle > angleThreshold) {
       const radius = positions.reduce((s, p) => {
         return s + Math.sqrt((p.x - centerX) ** 2 + (p.y - centerY) ** 2);
       }, 0) / positions.length;
 
-      const passesRadius = radius > ROTATION_RADIUS_THRESHOLD || absRollAngle > ROTATION_ANGLE_THRESHOLD;
+      const passesRadius = radius > ROTATION_RADIUS_THRESHOLD || absRollAngle > angleThreshold;
 
       if (passesRadius && now - history.lastRotationEmit > ROTATION_COOLDOWN_MS) {
         history.rotationAngle += combinedAngle;
@@ -402,7 +401,7 @@ export class GestureDetector {
     const openness = this.computeOpenness(landmarks);
 
     if (openness < PALM_CLOSE_THRESHOLD) {
-      if (!history.rotationActive) {
+      if (!history.rotationActive && now - history.lastRotationEmit > POST_ROTATION_BLOOM_BLOCK_MS) {
         history.palmWasClosed = true;
       }
       return;
@@ -466,13 +465,13 @@ export class GestureDetector {
       return;
     }
 
+    const middleExtended = this.isFingerExtended(landmarks, MIDDLE_TIP, MIDDLE_DIP, MIDDLE_MCP);
     const ringExtended = this.isFingerExtended(landmarks, RING_TIP, RING_DIP, RING_MCP);
     const pinkyExtended = this.isFingerExtended(landmarks, PINKY_TIP, PINKY_DIP, PINKY_MCP);
-    const middleExtended = this.isFingerExtended(landmarks, MIDDLE_TIP, MIDDLE_DIP, MIDDLE_MCP);
 
     const otherFingersUp = (middleExtended ? 1 : 0) + (ringExtended ? 1 : 0) + (pinkyExtended ? 1 : 0);
 
-    if (otherFingersUp < 2) {
+    if (otherFingersUp < 1) {
       history.pinchStartTime = 0;
       return;
     }

@@ -197,7 +197,7 @@ export default function Garden() {
           height: cameraHeight,
           borderRadius: 8,
           border: '1px solid rgba(233, 232, 213, 0.3)',
-          opacity: cameraState === 'active' ? 0.8 : 0,
+          opacity: cameraState === 'active' && started ? 0.8 : 0,
           transform: 'scaleX(-1)',
           objectFit: 'cover',
           transition: 'opacity 0.5s ease',
@@ -208,7 +208,7 @@ export default function Garden() {
         muted
       />
 
-      {cameraState === 'active' && (
+      {cameraState === 'active' && started && (
         <div
           style={{
             position: 'fixed',
@@ -238,7 +238,7 @@ export default function Garden() {
             {gestureToast && <GestureToastIcon type={gestureToast.type} size={14} />}
             {gestureToast && TOAST_LABELS[gestureToast.type]}
           </span>
-          <span style={{ opacity: 0.5 }}>
+          <span style={{ fontWeight: 300, opacity: 0.5 }}>
             {handsDetected > 0
               ? `${handsDetected} hand${handsDetected > 1 ? 's' : ''}`
               : 'Show your hands'}
@@ -278,8 +278,8 @@ export default function Garden() {
                     {item.icon}
                   </div>
                   <div>
-                    <div style={{ fontSize: ts(tier, 'base'), opacity: 0.85 }}>{item.label}</div>
-                    <div style={{ fontSize: ts(tier, 'xs'), opacity: 0.4, marginTop: 1 }}>{item.description}</div>
+                    <div style={{ fontSize: ts(tier, 'base'), fontWeight: 300, opacity: 0.85 }}>{item.label}</div>
+                    <div style={{ fontSize: ts(tier, 'xs'), fontWeight: 300, opacity: 0.6, marginTop: 1 }}>{item.description}</div>
                   </div>
                 </div>
               ))}
@@ -338,8 +338,8 @@ export default function Garden() {
                         {item.icon}
                       </div>
                       <div>
-                        <div style={{ fontSize: ts(tier, 'lg'), opacity: 0.9 }}>{item.label}</div>
-                        <div style={{ fontSize: ts(tier, 'xs'), opacity: 0.5, marginTop: 2 }}>{item.description}</div>
+                        <div style={{ fontSize: ts(tier, 'lg'), fontWeight: 300, opacity: 0.85 }}>{item.label}</div>
+                        <div style={{ fontSize: ts(tier, 'xs'), fontWeight: 300, opacity: 0.6, marginTop: 2 }}>{item.description}</div>
                       </div>
                     </div>
                   ))}
@@ -362,8 +362,8 @@ export default function Garden() {
           zIndex: 20,
           padding: '0 24px',
         }}>
-          <p style={{ fontSize: ts(tier, 'xl'), marginBottom: 16 }}>Camera access is needed</p>
-          <p style={{ fontSize: ts(tier, 'base'), opacity: 0.7 }}>
+          <p style={{ fontSize: ts(tier, 'xl'), fontWeight: 300, opacity: 0.85 }}>Camera access is needed</p>
+          <p style={{ fontSize: ts(tier, 'base'), fontWeight: 300, opacity: 0.6, marginTop: 16 }}>
             Please allow camera access in your browser settings and reload the page.
           </p>
         </div>
@@ -381,8 +381,8 @@ export default function Garden() {
           zIndex: 20,
           padding: '0 24px',
         }}>
-          <p style={{ fontSize: ts(tier, 'xl'), marginBottom: 16 }}>Something went wrong</p>
-          <p style={{ fontSize: ts(tier, 'base'), opacity: 0.7, marginBottom: 24 }}>
+          <p style={{ fontSize: ts(tier, 'xl'), fontWeight: 300, opacity: 0.85 }}>Something went wrong</p>
+          <p style={{ fontSize: ts(tier, 'base'), fontWeight: 300, opacity: 0.6, marginTop: 16, marginBottom: 24 }}>
             Could not access the camera. Please check your device.
           </p>
           <button
@@ -454,12 +454,12 @@ export default function Garden() {
             height: '100%',
             display: 'flex',
             flexDirection: 'column',
-            alignItems: 'center',
+            alignItems: isDesktop ? 'center' : 'flex-start',
             justifyContent: 'center',
             zIndex: 25,
-            background: 'rgba(51, 68, 42, 0.88)',
+            background: 'rgba(51, 68, 42, 0.95)',
             cursor: 'pointer',
-            padding: '24px',
+            padding: isDesktop ? '24px' : '24px 28px',
             boxSizing: 'border-box',
           }}
         >
@@ -468,7 +468,7 @@ export default function Garden() {
             fontFamily: FONT,
             fontSize: ts(tier, '3xl'),
             fontWeight: 200,
-            letterSpacing: 8,
+            letterSpacing: isDesktop ? 8 : 4,
             marginBottom: 8,
             textTransform: 'uppercase',
           }}>
@@ -480,8 +480,7 @@ export default function Garden() {
             fontFamily: FONT,
             fontSize: ts(tier, 'lg'),
             fontWeight: 300,
-            fontStyle: 'italic',
-            opacity: 0.5,
+            opacity: 0.6,
             marginBottom: isDesktop ? 60 : 50,
             letterSpacing: 2,
           }}>
@@ -494,7 +493,7 @@ export default function Garden() {
             gap: isDesktop ? 50 : 28,
             maxWidth: isDesktop ? 720 : 380,
             width: '100%',
-            justifyContent: 'center',
+            justifyContent: isDesktop ? 'center' : 'flex-start',
           }}>
             {gestureItems.map((item, i) => (
               <div key={i} style={{
@@ -519,13 +518,14 @@ export default function Garden() {
                 <div>
                   <div style={{
                     fontSize: ts(tier, 'xl'),
-                    opacity: 0.9,
+                    opacity: 0.85,
                     fontWeight: 300,
                     letterSpacing: 2,
                   }}>{item.label}</div>
                   <div style={{
-                    fontSize: ts(tier, 'xs'),
-                    opacity: 0.45,
+                    fontSize: ts(tier, 'sm'),
+                    fontWeight: 300,
+                    opacity: 0.6,
                     marginTop: 3,
                   }}>{item.description}</div>
                 </div>
@@ -537,7 +537,8 @@ export default function Garden() {
             color: '#E9E8D5',
             fontFamily: FONT,
             fontSize: ts(tier, 'base'),
-            opacity: 0.4,
+            fontWeight: 300,
+            opacity: 0.5,
             marginTop: isDesktop ? 60 : 50,
           }}>
             Tap anywhere to begin
