@@ -5,6 +5,10 @@ import { GestureDetector, GestureEvent } from '../lib/gestureDetector';
 
 export type CameraState = 'idle' | 'requesting' | 'active' | 'denied' | 'error';
 
+// Detect mobile devices — lower resources available for WASM inference
+const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+  || window.innerWidth <= 768;
+
 export function useHandTracking(
   onGesture: (event: GestureEvent) => void,
   enabled: boolean
@@ -14,6 +18,7 @@ export function useHandTracking(
   const cameraRef = useRef<Camera | null>(null);
   const handsRef = useRef<Hands | null>(null);
   const destroyedRef = useRef(false);
+  const processingRef = useRef(false);
   const [cameraState, setCameraState] = useState<CameraState>('idle');
   const [handsDetected, setHandsDetected] = useState(0);
 
@@ -41,9 +46,12 @@ export function useHandTracking(
 
       hands.setOptions({
         maxNumHands: 2,
-        modelComplexity: 1,
-        minDetectionConfidence: 0.6,
-        minTrackingConfidence: 0.5,
+        // Lite model (0) is 2-3× faster on mobile — critical for sufficient frame rate
+        modelComplexity: isMobile ? 0 : 1,
+        // Slightly looser thresholds on mobile: Lite model is less precise,
+        // loosening prevents dropping valid detections
+        minDetectionConfidence: isMobile ? 0.5 : 0.6,
+        minTrackingConfidence: isMobile ? 0.4 : 0.5,
       });
 
       hands.onResults((results: Results) => {
@@ -71,15 +79,23 @@ export function useHandTracking(
       const camera = new Camera(videoRef.current, {
         onFrame: async () => {
           if (destroyedRef.current) return;
+          // Frame skipping: if MediaPipe is still processing the previous frame,
+          // skip this one rather than letting frames queue up (causes growing latency)
+          if (processingRef.current) return;
           if (videoRef.current && handsRef.current) {
+            processingRef.current = true;
             try {
               await handsRef.current.send({ image: videoRef.current });
             } catch {
+            } finally {
+              processingRef.current = false;
             }
           }
         },
-        width: 640,
-        height: 480,
+        // Lower resolution on mobile: MediaPipe downscales to 256×256 internally anyway.
+        // 480×360 reduces per-frame pixel count by ~44%, directly speeding up inference.
+        width: isMobile ? 480 : 640,
+        height: isMobile ? 360 : 480,
       });
 
       cameraRef.current = camera;

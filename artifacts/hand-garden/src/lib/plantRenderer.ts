@@ -84,7 +84,10 @@ export class PlantRenderer {
   }
 
   resize() {
-    const dpr = window.devicePixelRatio || 1;
+    const rawDpr = window.devicePixelRatio || 1;
+    // Cap at 2× on mobile — 3× (iPhone 15) is visually imperceptible but
+    // renders 56% more pixels, stealing CPU/GPU from MediaPipe inference
+    const dpr = this.isMobile() ? Math.min(rawDpr, 2) : rawDpr;
     this.canvas.width = window.innerWidth * dpr;
     this.canvas.height = window.innerHeight * dpr;
     this.canvas.style.width = window.innerWidth + 'px';
@@ -368,7 +371,9 @@ export class PlantRenderer {
       return;
     }
 
-    const stepsPerSegment = 8;
+    // 4 steps on mobile: curves still look smooth but 50% fewer path operations,
+    // freeing main-thread CPU for MediaPipe WASM inference
+    const stepsPerSegment = this.isMobile() ? 4 : 8;
     for (let i = 0; i < segments.length - 1; i++) {
       const p0 = segments[Math.max(0, i - 1)];
       const p1 = segments[i];
