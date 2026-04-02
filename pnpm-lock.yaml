@@ -157,6 +157,9 @@ importers:
 
   .:
     devDependencies:
+      '@rollup/rollup-darwin-arm64':
+        specifier: ^4.60.1
+        version: 4.60.1
       prettier:
         specifier: ^3.8.1
         version: 3.8.1
@@ -1371,6 +1374,11 @@ packages:
 
   '@rolldown/pluginutils@1.0.0-rc.3':
     resolution: {integrity: sha512-eybk3TjzzzV97Dlj5c+XrBFW57eTNhzod66y9HrBlzJ6NsCrWCp/2kaPS3K9wJmurBC0Tdw4yPjXKZqlznim3Q==}
+
+  '@rollup/rollup-darwin-arm64@4.60.1':
+    resolution: {integrity: sha512-mjCpF7GmkRtSJwon+Rq1N8+pI+8l7w5g9Z3vWj4T7abguC4Czwi3Yu/pFaLvA3TTeMVjnu3ctigusqWUfjZzvw==}
+    cpu: [arm64]
+    os: [darwin]
 
   '@rollup/rollup-linux-x64-gnu@4.59.0':
     resolution: {integrity: sha512-3AHmtQq/ppNuUspKAlvA8HtLybkDflkMuLK4DPo77DfthRb71V84/c4MlWJXixZz4uruIH4uaa07IqoAkG64fg==}
@@ -4011,6 +4019,8 @@ snapshots:
       '@jridgewell/trace-mapping': 0.3.31
 
   '@rolldown/pluginutils@1.0.0-rc.3': {}
+
+  '@rollup/rollup-darwin-arm64@4.60.1': {}
 
   '@rollup/rollup-linux-x64-gnu@4.59.0':
     optional: true

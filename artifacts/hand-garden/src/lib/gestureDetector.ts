@@ -1,3 +1,5 @@
+import { OneEuroFilter2D } from './oneEuroFilter';
+
 export interface HandLandmark {
   x: number;
   y: number;
@@ -52,11 +54,16 @@ const PINCH_SUSTAIN_MS = 150;
 const BLOOM_LEAF_MUTUAL_COOLDOWN_MS = 500;
 const BLOOM_PINCH_GUARD_FACTOR = 1.5;
 
-const SMOOTH_FACTOR = 0.4;
+// One Euro Filter parameters — tuned for MediaPipe landmark noise
+const FILTER_MIN_CUTOFF = 1.0;   // Lower = more smoothing when still
+const FILTER_BETA = 0.007;       // Higher = less lag when moving fast
+const FILTER_D_CUTOFF = 1.0;
 
-interface SmoothedPosition {
-  x: number;
-  y: number;
+// Landmark indices that get filtered (the ones used for gesture math)
+const FILTERED_LANDMARKS = [WRIST, THUMB_TIP, INDEX_TIP, INDEX_MCP, MIDDLE_MCP, PINKY_MCP] as const;
+
+interface LandmarkFilters {
+  [landmarkIndex: number]: OneEuroFilter2D;
 }
 
 interface HandHistory {
@@ -75,7 +82,7 @@ interface HandHistory {
   pinchStartTime: number;
   lastLeafEmit: number;
 
-  smoothedPos: SmoothedPosition | null;
+  filters: LandmarkFilters;
   lastSeenTime: number;
 }
 
@@ -99,6 +106,10 @@ export class GestureDetector {
 
   private getHistory(handIndex: number): HandHistory {
     if (!this.handHistories.has(handIndex)) {
+      const filters: LandmarkFilters = {};
+      for (const idx of FILTERED_LANDMARKS) {
+        filters[idx] = new OneEuroFilter2D(FILTER_MIN_CUTOFF, FILTER_BETA, FILTER_D_CUTOFF);
+      }
       this.handHistories.set(handIndex, {
         wristPositions: [],
         rotationAngle: 0,
@@ -111,7 +122,7 @@ export class GestureDetector {
         lastPinchEmit: 0,
         pinchStartTime: 0,
         lastLeafEmit: 0,
-        smoothedPos: null,
+        filters,
         lastSeenTime: 0,
       });
     }
@@ -233,11 +244,14 @@ export class GestureDetector {
       const history = this.getHistory(stableIndex);
       history.lastSeenTime = now;
 
-      this.lastWristPos.set(stableIndex, { x: landmarks[WRIST].x, y: landmarks[WRIST].y });
+      // Apply One Euro filters to key landmarks before gesture detection
+      const filtered = this.filterLandmarks(landmarks, history, now);
 
-      this.detectFistRotation(landmarks, stableIndex, history, now);
-      this.detectPalmOpenClose(landmarks, stableIndex, history, now);
-      this.detectPinch(landmarks, stableIndex, history, now);
+      this.lastWristPos.set(stableIndex, { x: filtered[WRIST].x, y: filtered[WRIST].y });
+
+      this.detectFistRotation(filtered, stableIndex, history, now);
+      this.detectPalmOpenClose(filtered, stableIndex, history, now);
+      this.detectPinch(filtered, stableIndex, history, now);
     });
 
     const HISTORY_GRACE_MS = 500;
@@ -248,18 +262,20 @@ export class GestureDetector {
     }
   }
 
-  private smoothPosition(
+  private filterLandmarks(
+    landmarks: HandLandmark[],
     history: HandHistory,
-    rawX: number,
-    rawY: number
-  ): { x: number; y: number } {
-    if (!history.smoothedPos) {
-      history.smoothedPos = { x: rawX, y: rawY };
-      return { x: rawX, y: rawY };
+    now: number
+  ): HandLandmark[] {
+    const result = [...landmarks];
+    for (const idx of FILTERED_LANDMARKS) {
+      const filter = history.filters[idx];
+      if (filter && landmarks[idx]) {
+        const smoothed = filter.filter(landmarks[idx].x, landmarks[idx].y, now);
+        result[idx] = { x: smoothed.x, y: smoothed.y, z: landmarks[idx].z };
+      }
     }
-    history.smoothedPos.x += (rawX - history.smoothedPos.x) * SMOOTH_FACTOR;
-    history.smoothedPos.y += (rawY - history.smoothedPos.y) * SMOOTH_FACTOR;
-    return { x: history.smoothedPos.x, y: history.smoothedPos.y };
+    return result;
   }
 
   private computeOpenness(landmarks: HandLandmark[]): number {
@@ -328,10 +344,7 @@ export class GestureDetector {
 
     const wrist = landmarks[WRIST];
     const middleMcp = landmarks[MIDDLE_MCP];
-    const rawX = (wrist.x + middleMcp.x) / 2;
-    const rawY = (wrist.y + middleMcp.y) / 2;
-    const smoothed = this.smoothPosition(history, rawX, rawY);
-    const pos = { x: smoothed.x, y: smoothed.y, time: now };
+    const pos = { x: (wrist.x + middleMcp.x) / 2, y: (wrist.y + middleMcp.y) / 2, time: now };
 
     history.wristPositions.push(pos);
 
