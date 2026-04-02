@@ -54,13 +54,20 @@ const PINCH_SUSTAIN_MS = 150;
 const BLOOM_LEAF_MUTUAL_COOLDOWN_MS = 500;
 const BLOOM_PINCH_GUARD_FACTOR = 1.5;
 
+const SMOOTH_FACTOR = 0.4;
+
 // One Euro Filter parameters — tuned for MediaPipe landmark noise
 const FILTER_MIN_CUTOFF = 1.0;   // Lower = more smoothing when still
 const FILTER_BETA = 0.007;       // Higher = less lag when moving fast
 const FILTER_D_CUTOFF = 1.0;
 
-// Landmark indices that get filtered (the ones used for gesture math)
+// Landmark indices that get filtered (used for pinch and bloom gesture math)
 const FILTERED_LANDMARKS = [WRIST, THUMB_TIP, INDEX_TIP, INDEX_MCP, MIDDLE_MCP, PINKY_MCP] as const;
+
+interface SmoothedPosition {
+  x: number;
+  y: number;
+}
 
 interface LandmarkFilters {
   [landmarkIndex: number]: OneEuroFilter2D;
@@ -82,6 +89,7 @@ interface HandHistory {
   pinchStartTime: number;
   lastLeafEmit: number;
 
+  smoothedPos: SmoothedPosition | null;
   filters: LandmarkFilters;
   lastSeenTime: number;
 }
@@ -122,6 +130,7 @@ export class GestureDetector {
         lastPinchEmit: 0,
         pinchStartTime: 0,
         lastLeafEmit: 0,
+        smoothedPos: null,
         filters,
         lastSeenTime: 0,
       });
@@ -244,13 +253,16 @@ export class GestureDetector {
       const history = this.getHistory(stableIndex);
       history.lastSeenTime = now;
 
-      // Apply One Euro filters to key landmarks before gesture detection
+      // One Euro filters for pinch and bloom (stable distance/openness readings)
       const filtered = this.filterLandmarks(landmarks, history, now);
 
       this.lastWristPos.set(stableIndex, { x: filtered[WRIST].x, y: filtered[WRIST].y });
 
-      this.detectFistRotation(filtered, stableIndex, history, now);
-      this.detectPalmOpenClose(filtered, stableIndex, history, now);
+      // Rotation gets RAW landmarks — it needs the position variation the filter dampens
+      this.detectFistRotation(landmarks, stableIndex, history, now);
+      // Bloom also gets RAW — its openness must match rotation's openness check
+      this.detectPalmOpenClose(landmarks, stableIndex, history, now);
+      // Only pinch keeps filtered — benefits from stable thumb-index distance
       this.detectPinch(filtered, stableIndex, history, now);
     });
 
@@ -276,6 +288,20 @@ export class GestureDetector {
       }
     }
     return result;
+  }
+
+  private smoothPosition(
+    history: HandHistory,
+    rawX: number,
+    rawY: number
+  ): { x: number; y: number } {
+    if (!history.smoothedPos) {
+      history.smoothedPos = { x: rawX, y: rawY };
+      return { x: rawX, y: rawY };
+    }
+    history.smoothedPos.x += (rawX - history.smoothedPos.x) * SMOOTH_FACTOR;
+    history.smoothedPos.y += (rawY - history.smoothedPos.y) * SMOOTH_FACTOR;
+    return { x: history.smoothedPos.x, y: history.smoothedPos.y };
   }
 
   private computeOpenness(landmarks: HandLandmark[]): number {
@@ -344,7 +370,10 @@ export class GestureDetector {
 
     const wrist = landmarks[WRIST];
     const middleMcp = landmarks[MIDDLE_MCP];
-    const pos = { x: (wrist.x + middleMcp.x) / 2, y: (wrist.y + middleMcp.y) / 2, time: now };
+    const rawX = (wrist.x + middleMcp.x) / 2;
+    const rawY = (wrist.y + middleMcp.y) / 2;
+    const smoothed = this.smoothPosition(history, rawX, rawY);
+    const pos = { x: smoothed.x, y: smoothed.y, time: now };
 
     history.wristPositions.push(pos);
 

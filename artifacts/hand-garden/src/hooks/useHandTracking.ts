@@ -46,12 +46,9 @@ export function useHandTracking(
 
       hands.setOptions({
         maxNumHands: 2,
-        // Lite model (0) is 2-3× faster on mobile — critical for sufficient frame rate
-        modelComplexity: isMobile ? 0 : 1,
-        // Slightly looser thresholds on mobile: Lite model is less precise,
-        // loosening prevents dropping valid detections
-        minDetectionConfidence: isMobile ? 0.5 : 0.6,
-        minTrackingConfidence: isMobile ? 0.4 : 0.5,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.6,
+        minTrackingConfidence: 0.5,
       });
 
       hands.onResults((results: Results) => {
